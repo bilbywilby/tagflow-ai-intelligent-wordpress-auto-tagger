@@ -82,6 +82,24 @@ export interface SessionInfo {
   createdAt: number;
   lastActive: number;
 }
+export interface Tag {
+  id: string;
+  name: string;
+  confidence: number;
+}
+
+export interface Article {
+  id: string;
+  title: string | null;
+  content: string;
+  excerpt: string;
+  url: string;
+  publishedDate?: string;
+  author?: string;
+  tags: Tag[];
+  status: string;
+}
+
 export interface EventFilters {
   category?: HubCategory;
   location?: HubLocation;
