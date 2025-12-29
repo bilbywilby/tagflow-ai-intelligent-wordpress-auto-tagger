@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '@/store/useAppStore';
-import { RSS_FEEDS } from '@/data/rssFeEDS';
+import { RSS_FEEDS } from '@/data/rssFeeds';
 import { FeedCard } from '@/components/FeedCard';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
