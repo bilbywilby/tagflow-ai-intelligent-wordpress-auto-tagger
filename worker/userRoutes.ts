@@ -4,6 +4,7 @@ import OpenAI from "openai";
 import Parser from "rss-parser";
 import { HubEvent, MorningBriefing } from "./types";
 import { runProSync } from "./intelligence";
+import { REGIONAL_GEOFENCES } from "./geofences";
 const parser = new Parser({
   customFields: {
     item: [['media:content', 'mediaContent'], ['content:encoded', 'contentEncoded']]
@@ -31,8 +32,18 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const controller = getAppController(c.env);
     const category = c.req.query('category') as any;
     const location = c.req.query('location') as any;
+    const neighborhood = c.req.query('neighborhood');
     const searchQuery = c.req.query('q');
-    const events = await controller.listEvents({ category, location, searchQuery });
+    const events = await controller.listEvents({ category, location, neighborhood, searchQuery });
+    return c.json({ success: true, data: events });
+  });
+  app.get('/api/hub/geofences', async (c) => {
+    return c.json({ success: true, data: REGIONAL_GEOFENCES });
+  });
+  app.get('/api/hub/search', async (c) => {
+    const controller = getAppController(c.env);
+    const q = c.req.query('q');
+    const events = await controller.listEvents({ searchQuery: q });
     return c.json({ success: true, data: events });
   });
   app.get('/api/hub/briefing', async (c) => {

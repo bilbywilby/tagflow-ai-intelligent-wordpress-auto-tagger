@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import Parser from "rss-parser";
 import type { Env } from "./core-utils";
 import type { HubEvent, HubLocation, HubCategory } from "./types";
+import { resolveNeighborhood, extractZipCode } from "./geofences";
 const parser = new Parser({
   customFields: {
     item: [['media:content', 'mediaContent'], ['content:encoded', 'contentEncoded']]
@@ -28,21 +29,24 @@ export const LEHIGH_VALLEY_SOURCES = [
   }
 ];
 export async function normalizeContent(openai: OpenAI, title: string, content: string): Promise<{ 
-  summary: string; 
-  venue: string; 
-  location: HubLocation; 
+  summary: string;
+  venue: string;
+  location: HubLocation;
+  neighborhood?: string;
   category: HubCategory;
+  zipCode?: string;
 }> {
-  const prompt = `Act as a Lehigh Valley Regional Analyst. 
-  Extract structured metadata from this news snippet. 
+  const prompt = `Act as a Lehigh Valley Regional Analyst.
+  Extract structured metadata from this news snippet.
   Rules:
   1. Summary MUST be exactly 2 professional sentences.
   2. Location MUST be one of: Allentown, Bethlehem, Easton, Greater LV.
-  3. Category MUST be one of: Family, Nightlife, Arts, News, General.
-  4. Venue should be the specific place (e.g., "PPL Center", "SteelStacks") or "Various Locations".
+  3. Neighborhood: Identify the specific district (e.g., "West End", "South Side", "Downtown") if mentioned.
+  4. Category MUST be one of: Family, Nightlife, Arts, News, General.
+  5. Venue: Specific place (e.g., "PPL Center", "SteelStacks") or "Various Locations".
   Input Title: ${title}
   Input Content: ${content.slice(0, 800)}
-  Return ONLY JSON: { "summary": "string", "venue": "string", "location": "string", "category": "string" }`;
+  Return ONLY JSON: { "summary": "string", "venue": "string", "location": "string", "neighborhood": "string", "category": "string" }`;
   try {
     const completion = await openai.chat.completions.create({
       model: "google-ai-studio/gemini-2.0-flash",
@@ -50,11 +54,17 @@ export async function normalizeContent(openai: OpenAI, title: string, content: s
       response_format: { type: "json_object" }
     });
     const data = JSON.parse(completion.choices[0].message.content || "{}");
+    
+    // Cross-validate with our canonical geofences
+    const validatedFence = resolveNeighborhood(`${title} ${content} ${data.neighborhood}`);
+    
     return {
       summary: data.summary || "Regional update from the Lehigh Valley area.",
       venue: data.venue || "Lehigh Valley",
-      location: (data.location as HubLocation) || "Greater LV",
-      category: (data.category as HubCategory) || "News"
+      location: (validatedFence?.canonicalPlace || data.location || "Greater LV") as HubLocation,
+      neighborhood: validatedFence?.name || data.neighborhood,
+      category: (data.category as HubCategory) || "News",
+      zipCode: extractZipCode(`${content} ${title}`)
     };
   } catch (e) {
     console.error("AI Normalization failed:", e);

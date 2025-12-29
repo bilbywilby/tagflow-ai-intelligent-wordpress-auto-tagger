@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Article, AppSettings, HubEvent, MorningBriefing, HubLocation } from '@/types/schema';
+import { Article, AppSettings, HubEvent, MorningBriefing, HubLocation, Geofence } from '@/types/schema';
 interface AppState {
   articles: Article[];
   events: HubEvent[];
@@ -16,6 +16,8 @@ interface AppState {
   // Hub Filters
   hubSearchQuery: string;
   hubSelectedLocation: HubLocation | null;
+  hubSelectedNeighborhood: string | null;
+  geofences: Geofence[];
   // Actions
   setArticles: (articles: Article[]) => void;
   addArticles: (articles: Article[]) => void;
@@ -35,6 +37,8 @@ interface AppState {
   setViewMode: (mode: 'grid' | 'list') => void;
   setHubSearchQuery: (query: string) => void;
   setHubSelectedLocation: (location: HubLocation | null) => void;
+  setHubSelectedNeighborhood: (neighborhood: string | null) => void;
+  setGeofences: (geofences: Geofence[]) => void;
 }
 export const useAppStore = create<AppState>((set) => ({
   articles: [],
@@ -50,6 +54,8 @@ export const useAppStore = create<AppState>((set) => ({
   viewMode: 'grid',
   hubSearchQuery: '',
   hubSelectedLocation: null,
+  hubSelectedNeighborhood: null,
+  geofences: [],
   settings: {
     wpApiUrl: 'https://demo.wordpress.org/wp-json',
     wpApiKey: '',
@@ -82,4 +88,6 @@ export const useAppStore = create<AppState>((set) => ({
   setViewMode: (viewMode) => set({ viewMode }),
   setHubSearchQuery: (hubSearchQuery) => set({ hubSearchQuery }),
   setHubSelectedLocation: (hubSelectedLocation) => set({ hubSelectedLocation }),
+  setHubSelectedNeighborhood: (hubSelectedNeighborhood) => set({ hubSelectedNeighborhood }),
+  setGeofences: (geofences) => set({ geofences }),
 }));

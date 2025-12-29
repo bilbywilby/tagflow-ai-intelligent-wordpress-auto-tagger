@@ -1,6 +1,13 @@
 export type TaggingStatus = 'pending' | 'analyzing' | 'tagged' | 'syncing' | 'synced' | 'error';
 export type HubCategory = 'Family' | 'Nightlife' | 'Arts' | 'News' | 'General';
 export type HubLocation = 'Allentown' | 'Bethlehem' | 'Easton' | 'Greater LV' | 'Other';
+export interface Geofence {
+  id: string;
+  name: string;
+  canonicalPlace: HubLocation;
+  aliases: string[];
+  zipCodes: string[];
+}
 export interface Tag {
   id: string;
   name: string;
@@ -25,6 +32,8 @@ export interface HubEvent {
   title: string;
   venue: string;
   location: HubLocation;
+  neighborhood?: string;
+  zipCode?: string;
   eventDate: string;
   category: HubCategory;
   summary: string;
