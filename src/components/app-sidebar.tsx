@@ -1,13 +1,13 @@
+import * as React from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Sparkles,
   Settings,
-  Info,
   ChevronRight,
-  Hash,
   Globe,
-  Hammer
+  Map,
+  Compass
 } from "lucide-react";
 import {
   Sidebar,
@@ -28,16 +28,16 @@ import {
 } from "@/components/ui/collapsible";
 import { TagflowLogo } from "@/components/TagflowLogo";
 import { cn } from "@/lib/utils";
-import { CATEGORIES, RSS_FEEDS } from "@/data/rssFeeds";
 import { useAppStore } from "@/store/useAppStore";
 export function AppSidebar(): JSX.Element {
   const location = useLocation();
-  const selectedCategory = useAppStore(s => s.selectedCategory);
-  const setSelectedCategory = useAppStore(s => s.setSelectedCategory);
+  const setHubSelectedLocation = useAppStore(s => s.setHubSelectedLocation);
+  const setHubSelectedNeighborhood = useAppStore(s => s.setHubSelectedNeighborhood);
   const events = useAppStore(s => s.events);
-  const getFeedCount = (category: string) => {
-    return RSS_FEEDS.filter(f => f.category === category).length;
-  };
+  const geofences = useAppStore(s => s.geofences);
+  const featuredNeighborhoods = React.useMemo(() => {
+    return geofences.slice(0, 8);
+  }, [geofences]);
   return (
     <Sidebar variant="floating" collapsible="icon">
       <SidebarHeader className="py-4 px-4">
@@ -65,15 +65,43 @@ export function AppSidebar(): JSX.Element {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            <Collapsible className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton className="h-11 px-3 rounded-xl">
+                    <Map className="size-5" />
+                    <span>Districts</span>
+                    <ChevronRight className="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenu className="px-4 mt-1 gap-1">
+                    {featuredNeighborhoods.map(fence => (
+                      <SidebarMenuItem key={fence.id}>
+                        <SidebarMenuButton
+                          size="sm"
+                          onClick={() => {
+                            setHubSelectedLocation(fence.canonicalPlace);
+                            setHubSelectedNeighborhood(fence.name);
+                          }}
+                          className="text-[11px] font-medium"
+                        >
+                          {fence.name}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
                 isActive={location.pathname === "/explorer"}
                 className={cn(
                   "h-11 px-3 rounded-xl transition-all",
-                  location.pathname === "/explorer" && !selectedCategory ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400 font-bold" : ""
+                  location.pathname === "/explorer" ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400 font-bold" : ""
                 )}
-                onClick={() => setSelectedCategory(null)}
               >
                 <Link to="/explorer">
                   <LayoutDashboard className="size-5" />
@@ -125,11 +153,11 @@ export function AppSidebar(): JSX.Element {
       <SidebarFooter className="p-4">
         <div className="bg-indigo-600/5 dark:bg-indigo-500/5 rounded-2xl p-4 border border-indigo-500/10">
           <div className="flex items-center gap-2 mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-600/80 dark:text-indigo-400">
-            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Intelligence Active
+            <Compass className="size-3 text-emerald-500" />
+            Intelligence Node
           </div>
           <p className="text-[10px] text-muted-foreground leading-relaxed">
-            {events.length} regional items curated. Next briefing tomorrow 6AM.
+            {events.length} regional items live. Neighborhood indexing active.
           </p>
         </div>
       </SidebarFooter>

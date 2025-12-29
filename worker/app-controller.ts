@@ -4,6 +4,7 @@ import type { Env } from './core-utils';
 export interface EventFilters {
   category?: HubCategory;
   location?: HubLocation;
+  neighborhood?: string;
   searchQuery?: string;
 }
 export class AppController extends DurableObject<Env> {
@@ -79,6 +80,9 @@ export class AppController extends DurableObject<Env> {
       if (filters.location) {
         results = results.filter(e => e.location === filters.location);
       }
+      if (filters.neighborhood) {
+        results = results.filter(e => e.neighborhood === filters.neighborhood);
+      }
       if (filters.searchQuery) {
         const query = filters.searchQuery.toLowerCase();
         results = results.filter(e =>
@@ -97,14 +101,17 @@ export class AppController extends DurableObject<Env> {
     const events = Array.from(this.events.values());
     const locationCounts: Record<string, number> = {};
     const categoryCounts: Record<string, number> = {};
+    const neighborhoodCounts: Record<string, number> = {};
     events.forEach(e => {
       locationCounts[e.location] = (locationCounts[e.location] || 0) + 1;
       categoryCounts[e.category] = (categoryCounts[e.category] || 0) + 1;
+      if (e.neighborhood) neighborhoodCounts[e.neighborhood] = (neighborhoodCounts[e.neighborhood] || 0) + 1;
     });
     return {
       total: events.length,
       locations: locationCounts,
       categories: categoryCounts,
+      neighborhoods: neighborhoodCounts,
       lastSync: new Date().toISOString()
     };
   }

@@ -13,11 +13,20 @@ export interface ErrorResult {
 }
 export type HubCategory = 'Family' | 'Nightlife' | 'Arts' | 'News' | 'General';
 export type HubLocation = 'Allentown' | 'Bethlehem' | 'Easton' | 'Greater LV' | 'Other';
+export interface Geofence {
+  id: string;
+  name: string;
+  canonicalPlace: HubLocation;
+  aliases: string[];
+  zipCodes: string[];
+}
 export interface HubEvent {
   id: string;
   title: string;
   venue: string;
   location: HubLocation;
+  neighborhood?: string;
+  zipCode?: string;
   eventDate: string;
   category: HubCategory;
   summary: string;
@@ -56,12 +65,9 @@ export interface SessionInfo {
   createdAt: number;
   lastActive: number;
 }
-export interface Tool {
-  name: string;
-  description: string;
-  parameters: {
-    type: string;
-    properties: Record<string, unknown>;
-    required: string[];
-  };
+export interface EventFilters {
+  category?: HubCategory;
+  location?: HubLocation;
+  neighborhood?: string;
+  searchQuery?: string;
 }

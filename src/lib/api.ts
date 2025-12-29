@@ -1,4 +1,4 @@
-import { Article, Tag, HubEvent, MorningBriefing, HubLocation, HubCategory } from '@/types/schema';
+import { Article, Tag, HubEvent, MorningBriefing, HubLocation, HubCategory, Geofence } from '@/types/schema';
 export async function fetchFeed(url: string): Promise<Article[]> {
   const res = await fetch('/api/rss/fetch', {
     method: 'POST',
@@ -29,14 +29,27 @@ export async function syncToWP(articleId: string, tags: Tag[]): Promise<void> {
   if (!json.success) throw new Error(json.error || 'Sync failed');
 }
 // --- Hub API ---
-export async function fetchEvents(location?: HubLocation | null, category?: HubCategory | null, q?: string): Promise<HubEvent[]> {
+export async function fetchEvents(location?: HubLocation | null, category?: HubCategory | null, q?: string, neighborhood?: string): Promise<HubEvent[]> {
   const params = new URLSearchParams();
   if (location) params.append('location', location);
   if (category) params.append('category', category);
   if (q) params.append('q', q);
+  if (neighborhood) params.append('neighborhood', neighborhood);
   const res = await fetch(`/api/hub/events?${params.toString()}`);
   const json = await res.json();
   if (!json.success) throw new Error(json.error || 'Failed to fetch hub events');
+  return json.data;
+}
+export async function fetchGeofences(): Promise<Geofence[]> {
+  const res = await fetch('/api/hub/geofences');
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to fetch geofences');
+  return json.data;
+}
+export async function searchHub(query: string): Promise<HubEvent[]> {
+  const res = await fetch(`/api/hub/search?q=${encodeURIComponent(query)}`);
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Search failed');
   return json.data;
 }
 export async function fetchBriefing(): Promise<MorningBriefing> {
@@ -56,7 +69,4 @@ export async function fetchHubStats(): Promise<any> {
   const json = await res.json();
   if (!json.success) throw new Error(json.error || 'Failed to fetch hub stats');
   return json.data;
-}
-export async function triggerCuration(): Promise<{ count: number }> {
-  return syncHubPro(); // Upgrade existing trigger to the pro sync logic
 }
