@@ -16,11 +16,24 @@ export class AppController extends DurableObject<Env> {
   }
   private async ensureLoaded(): Promise<void> {
     if (!this.loaded) {
-      const storedSessions = await this.ctx.storage.get<Record<string, SessionInfo>>('sessions') || {};
-      const storedEvents = await this.ctx.storage.get<Record<string, HubEvent>>('hub_events') || {};
-      const storedGeofences = await this.ctx.storage.get<Record<string, Geofence>>('geofences') || {};
-      const storedLandmarks = await this.ctx.storage.get<Record<string, Landmark>>('landmarks') || {};
-      const storedBriefing = await this.ctx.storage.get<MorningBriefing>('morning_briefing') || null;
+      const storedSessionsStr = await this.ctx.storage.get<string>('sessions') || '{}';
+      const storedEventsStr = await this.ctx.storage.get<string>('hub_events') || '{}';
+      const storedGeofencesStr = await this.ctx.storage.get<string>('geofences') || '{}';
+      const storedLandmarksStr = await this.ctx.storage.get<string>('landmarks') || '{}';
+      const storedBriefingStr = await this.ctx.storage.get<string>('morning_briefing') || 'null';
+
+      let storedSessions: Record<string, SessionInfo>;
+      let storedEvents: Record<string, HubEvent>;
+      let storedGeofences: Record<string, Geofence>;
+      let storedLandmarks: Record<string, Landmark>;
+      let storedBriefing: MorningBriefing | null;
+
+      try { storedSessions = JSON.parse(storedSessionsStr); } catch { storedSessions = {}; }
+      try { storedEvents = JSON.parse(storedEventsStr); } catch { storedEvents = {}; }
+      try { storedGeofences = JSON.parse(storedGeofencesStr); } catch { storedGeofences = {}; }
+      try { storedLandmarks = JSON.parse(storedLandmarksStr); } catch { storedLandmarks = {}; }
+      try { storedBriefing = JSON.parse(storedBriefingStr); } catch { storedBriefing = null; }
+
       this.sessions = new Map(Object.entries(storedSessions));
       this.events = new Map(Object.entries(storedEvents));
       this.geofences = new Map(Object.entries(storedGeofences));
