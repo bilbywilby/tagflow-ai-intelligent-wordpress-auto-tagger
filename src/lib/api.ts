@@ -45,19 +45,18 @@ export async function fetchBriefing(): Promise<MorningBriefing> {
   if (!json.success) throw new Error(json.error || 'Failed to fetch morning briefing');
   return json.data;
 }
-export async function triggerCuration(): Promise<{ count: number }> {
-  const res = await fetch('/api/hub/scrape', { method: 'POST' });
+export async function syncHubPro(): Promise<{ count: number }> {
+  const res = await fetch('/api/hub/sync', { method: 'POST' });
   const json = await res.json();
-  if (!json.success) throw new Error(json.error || 'Curation trigger failed');
+  if (!json.success) throw new Error(json.error || 'Professional sync failed');
   return json;
 }
-export async function parseRssToEvents(feedUrl: string): Promise<{ count: number }> {
-  const res = await fetch('/api/hub/parse-rss', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ feedUrl }),
-  });
+export async function fetchHubStats(): Promise<any> {
+  const res = await fetch('/api/hub/stats');
   const json = await res.json();
-  if (!json.success) throw new Error(json.error || 'Bulk parse failed');
-  return json;
+  if (!json.success) throw new Error(json.error || 'Failed to fetch hub stats');
+  return json.data;
+}
+export async function triggerCuration(): Promise<{ count: number }> {
+  return syncHubPro(); // Upgrade existing trigger to the pro sync logic
 }

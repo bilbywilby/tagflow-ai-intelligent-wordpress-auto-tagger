@@ -6,7 +6,9 @@ interface AppState {
   briefing: MorningBriefing | null;
   feedUrl: string;
   isLoading: boolean;
-  isCurating: boolean;
+  isCurating: boolean; // UI loading for hub refresh
+  isSyncing: boolean;   // Specific tracking for Pro Sync
+  hubStats: any;
   settings: AppSettings;
   searchQuery: string;
   selectedCategory: string | null;
@@ -23,6 +25,8 @@ interface AppState {
   setEvents: (events: HubEvent[]) => void;
   setBriefing: (briefing: MorningBriefing | null) => void;
   setCurating: (curating: boolean) => void;
+  setSyncing: (syncing: boolean) => void;
+  setHubStats: (stats: any) => void;
   setFeedUrl: (url: string) => void;
   setLoading: (loading: boolean) => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
@@ -39,6 +43,8 @@ export const useAppStore = create<AppState>((set) => ({
   feedUrl: '',
   isLoading: false,
   isCurating: false,
+  isSyncing: false,
+  hubStats: null,
   searchQuery: '',
   selectedCategory: null,
   viewMode: 'grid',
@@ -64,6 +70,8 @@ export const useAppStore = create<AppState>((set) => ({
   setEvents: (events) => set({ events }),
   setBriefing: (briefing) => set({ briefing }),
   setCurating: (isCurating) => set({ isCurating }),
+  setSyncing: (isSyncing) => set({ isSyncing }),
+  setHubStats: (hubStats) => set({ hubStats }),
   setFeedUrl: (feedUrl) => set({ feedUrl }),
   setLoading: (isLoading) => set({ isLoading }),
   updateSettings: (settings) => set((state) => ({

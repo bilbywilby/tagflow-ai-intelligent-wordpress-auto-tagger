@@ -2,101 +2,30 @@ import { Hono } from "hono";
 import { Env, getAppController } from "./core-utils";
 import OpenAI from "openai";
 import Parser from "rss-parser";
-import { HubEvent } from "./types";
+import { HubEvent, MorningBriefing } from "./types";
+import { runProSync } from "./intelligence";
 const parser = new Parser({
   customFields: {
     item: [['media:content', 'mediaContent'], ['content:encoded', 'contentEncoded']]
   }
 });
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
-  app.post('/api/hub/scrape', async (c) => {
+  // Pro Sync Endpoint
+  app.post('/api/hub/sync', async (c) => {
     try {
-      const openai = new OpenAI({ baseURL: c.env.CF_AI_BASE_URL, apiKey: c.env.CF_AI_API_KEY });
       const controller = getAppController(c.env);
-      const sources = [
-        "https://www.lehighvalleynews.com/index.rss",
-        "https://www.wfmz.com/search/?f=rss&t=article&c=news/lehigh-valley"
-      ];
-      const allItems: any[] = [];
-      for (const url of sources) {
-        try {
-          const res = await fetch(url, { headers: { 'User-Agent': 'TagFlow Hub 1.0' } });
-          if (res.ok) {
-            const feed = await parser.parseString(await res.text());
-            allItems.push(...feed.items.slice(0, 5));
-          }
-        } catch (e) {
-          console.error(`Feed fetch error for ${url}:`, e);
-        }
-      }
-      const curatedEvents: HubEvent[] = [];
-      for (const item of allItems) {
-        const prompt = `Act as the Lehigh Valley Regional Curator. Extract structured event/news data from this item.
-        Locations MUST be one of: Allentown, Bethlehem, Easton, Greater LV.
-        Categories MUST be one of: Family, Nightlife, Arts, News, General.
-        Return ONLY a JSON object: { "title": "string", "venue": "string", "location": "string", "category": "string", "summary": "string" }
-        Item: ${item.title} - ${item.contentSnippet || item.content}`;
-        const completion = await openai.chat.completions.create({
-          model: "google-ai-studio/gemini-2.0-flash",
-          messages: [{ role: "user", content: prompt }],
-          response_format: { type: "json_object" }
-        });
-        const data = JSON.parse(completion.choices[0].message.content || '{}');
-        const hubEvent: HubEvent = {
-          id: crypto.randomUUID(),
-          title: data.title || item.title,
-          venue: data.venue || "Various Locations",
-          location: data.location || "Greater LV",
-          category: data.category || "News",
-          summary: data.summary || item.contentSnippet?.slice(0, 150),
-          eventDate: item.pubDate || new Date().toISOString(),
-          sourceUrl: item.link || "",
-          createdAt: new Date().toISOString()
-        };
-        await controller.upsertEvent(hubEvent);
-        curatedEvents.push(hubEvent);
-      }
-      return c.json({ success: true, count: curatedEvents.length });
+      const count = await runProSync(c.env, controller);
+      return c.json({ success: true, count });
     } catch (error) {
-      console.error('Hub Scrape Error:', error);
-      return c.json({ success: false, error: "Curation failed" }, 500);
+      console.error('Pro Sync Error:', error);
+      return c.json({ success: false, error: "Sync pipeline failed" }, 500);
     }
   });
-  app.post('/api/hub/parse-rss', async (c) => {
-    try {
-      const { feedUrl } = await c.req.json();
-      if (!feedUrl) return c.json({ success: false, error: "Feed URL required" }, 400);
-      const openai = new OpenAI({ baseURL: c.env.CF_AI_BASE_URL, apiKey: c.env.CF_AI_API_KEY });
-      const controller = getAppController(c.env);
-      const res = await fetch(feedUrl, { headers: { 'User-Agent': 'TagFlow Hub 1.0' } });
-      const feed = await parser.parseString(await res.text());
-      const items = feed.items.slice(0, 3);
-      for (const item of items) {
-        const prompt = `Convert this blog/news item into a structured regional 'HubEvent'. 
-        Return JSON: { "title": "string", "venue": "string", "location": "Allentown|Bethlehem|Easton|Greater LV", "category": "Family|Nightlife|Arts|News|General", "summary": "short summary" }
-        Input: ${item.title} - ${item.contentSnippet || item.content}`;
-        const completion = await openai.chat.completions.create({
-          model: "google-ai-studio/gemini-2.0-flash",
-          messages: [{ role: "user", content: prompt }],
-          response_format: { type: "json_object" }
-        });
-        const data = JSON.parse(completion.choices[0].message.content || '{}');
-        await controller.upsertEvent({
-          id: crypto.randomUUID(),
-          title: data.title || item.title,
-          venue: data.venue || "Online / Remote",
-          location: data.location || "Greater LV",
-          category: data.category || "General",
-          summary: data.summary || item.contentSnippet || "",
-          eventDate: item.pubDate || new Date().toISOString(),
-          sourceUrl: item.link || "",
-          createdAt: new Date().toISOString()
-        });
-      }
-      return c.json({ success: true, count: items.length });
-    } catch (error) {
-      return c.json({ success: false, error: String(error) }, 500);
-    }
+  // Hub Stats Endpoint
+  app.get('/api/hub/stats', async (c) => {
+    const controller = getAppController(c.env);
+    const stats = await controller.getSyncStats();
+    return c.json({ success: true, data: stats });
   });
   app.get('/api/hub/events', async (c) => {
     const controller = getAppController(c.env);
@@ -108,33 +37,40 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   });
   app.get('/api/hub/briefing', async (c) => {
     const controller = getAppController(c.env);
-    let briefing = await controller.getMorningBriefing();
-    if (!briefing) {
+    const existingBriefing = await controller.getMorningBriefing();
+    if (existingBriefing) {
+      return c.json({ success: true, data: existingBriefing });
+    }
+    try {
       const openai = new OpenAI({ baseURL: c.env.CF_AI_BASE_URL, apiKey: c.env.CF_AI_API_KEY });
       const events = await controller.listEvents();
       const topEvents = events.slice(0, 10).map(e => `${e.title} at ${e.venue} in ${e.location}`).join('\n');
       const prompt = `Generate a high-quality "Morning Briefing" for the Lehigh Valley region.
-      Highlight current events in Allentown, Bethlehem, and Easton. 
+      Highlight current events in Allentown, Bethlehem, and Easton.
       Tone: Professional, optimistic, community-focused.
+      Limit to 3 concise paragraphs.
       Context: ${topEvents}`;
       const completion = await openai.chat.completions.create({
         model: "google-ai-studio/gemini-2.0-flash",
         messages: [{ role: "user", content: prompt }]
       });
-      briefing = {
+      const regionalBriefing = {
         id: crypto.randomUUID(),
         date: new Date().toISOString(),
         content: completion.choices[0].message.content || "No regional updates available at this hour.",
         highlightCount: events.length
-      };
-      await controller.saveMorningBriefing(briefing);
+      } as MorningBriefing;
+      await controller.saveMorningBriefing(regionalBriefing);
+      return c.json({ success: true, data: regionalBriefing });
+    } catch (err) {
+      return c.json({ success: false, error: "Briefing generation failed" }, 500);
     }
-    return c.json({ success: true, data: briefing });
   });
   app.post('/api/rss/fetch', async (c) => {
     try {
       const { url } = await c.req.json();
-      const feed = await parser.parseString(await (await fetch(url)).text());
+      const res = await fetch(url);
+      const feed = await parser.parseString(await res.text());
       const data = feed.items.map(item => ({
         id: crypto.randomUUID(),
         title: item.title,
@@ -154,16 +90,18 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     try {
       const { title, content } = await c.req.json();
       const openai = new OpenAI({ baseURL: c.env.CF_AI_BASE_URL, apiKey: c.env.CF_AI_API_KEY });
-      const prompt = `Analyze this blog post and return a JSON array of 5 SEO tags. 
+      const prompt = `Analyze this blog post and return a JSON array of 5 SEO tags.
       Title: ${title}
-      Content: ${content.slice(0, 1000)}`;
+      Content: ${content.slice(0, 1000)}
+      Return JSON: { "tags": ["tag1", "tag2", ...] }`;
       const completion = await openai.chat.completions.create({
         model: "google-ai-studio/gemini-2.0-flash",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" }
       });
       const result = JSON.parse(completion.choices[0].message.content || '{"tags": []}');
-      const tags = (result.tags || result).map((name: string) => ({
+      const tagNames = Array.isArray(result.tags) ? result.tags : [];
+      const tags = tagNames.map((name: string) => ({
         id: crypto.randomUUID(),
         name,
         confidence: 0.95
