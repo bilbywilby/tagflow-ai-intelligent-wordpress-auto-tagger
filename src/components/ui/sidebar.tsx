@@ -45,7 +45,15 @@ const SidebarContext = React.createContext<SidebarContextProps | null>(null)
 function useSidebar() {
   const context = React.useContext(SidebarContext)
   if (!context) {
-    throw new Error("useSidebar must be used within a SidebarProvider.")
+    return {
+      state: 'expanded',
+      open: true,
+      setOpen: () => {},
+      openMobile: false,
+      setOpenMobile: () => {},
+      isMobile: false,
+      toggleSidebar: () => {},
+    }
   }
 
   return context
@@ -78,9 +86,12 @@ const SidebarProvider = React.forwardRef<
     // We use openProp and setOpenProp for control from outside the component.
     const [_open, _setOpen] = React.useState(defaultOpen)
     const open = openProp ?? _open
+    const openRef = React.useRef(open)
+    openRef.current = open
+    
     const setOpen = React.useCallback(
-      (value: boolean | ((value: boolean) => boolean)) => {
-        const openState = typeof value === "function" ? value(open) : value
+      (value: boolean | ((prev: boolean) => boolean)) => {
+        const openState = typeof value === "function" ? value(openRef.current) : value
         if (setOpenProp) {
           setOpenProp(openState)
         } else {
@@ -90,7 +101,7 @@ const SidebarProvider = React.forwardRef<
         // This sets the cookie to keep the sidebar state.
         document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
       },
-      [setOpenProp, open]
+      [setOpenProp]
     )
 
     // Helper to toggle the sidebar.
