@@ -62,8 +62,10 @@ export class AppController extends DurableObject<Env> {
   }
   async upsertEvent(event: HubEvent): Promise<void> {
     await this.ensureLoaded();
-    const normalizedTitle = event.title.toLowerCase().trim().replace(/[^\w\s]/gi, '');
-    const dedupKey = `${normalizedTitle}_${new Date(event.eventDate).toISOString().split('T')[0]}`;
+    // Improved deduplication: Normalize title and use date as composite key
+    const normalizedTitle = event.title.toLowerCase().trim().replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
+    const dateStr = new Date(event.eventDate).toISOString().split('T')[0];
+    const dedupKey = `${normalizedTitle}_${dateStr}`;
     this.events.set(dedupKey, { ...event, id: event.id || crypto.randomUUID() });
     await this.persistEvents();
   }
@@ -79,16 +81,32 @@ export class AppController extends DurableObject<Env> {
       }
       if (filters.searchQuery) {
         const query = filters.searchQuery.toLowerCase();
-        results = results.filter(e => 
-          e.title.toLowerCase().includes(query) || 
+        results = results.filter(e =>
+          e.title.toLowerCase().includes(query) ||
           e.summary.toLowerCase().includes(query) ||
           e.venue.toLowerCase().includes(query)
         );
       }
     }
-    return results.sort((a, b) =>
+    return results.sort((a, b) => 
       new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime()
     );
+  }
+  async getSyncStats() {
+    await this.ensureLoaded();
+    const events = Array.from(this.events.values());
+    const locationCounts: Record<string, number> = {};
+    const categoryCounts: Record<string, number> = {};
+    events.forEach(e => {
+      locationCounts[e.location] = (locationCounts[e.location] || 0) + 1;
+      categoryCounts[e.category] = (categoryCounts[e.category] || 0) + 1;
+    });
+    return {
+      total: events.length,
+      locations: locationCounts,
+      categories: categoryCounts,
+      lastSync: new Date().toISOString()
+    };
   }
   async saveMorningBriefing(briefing: MorningBriefing): Promise<void> {
     await this.ensureLoaded();
@@ -98,5 +116,18 @@ export class AppController extends DurableObject<Env> {
   async getMorningBriefing(): Promise<MorningBriefing | null> {
     await this.ensureLoaded();
     return this.briefing;
+  }
+  async pruneOldEvents(): Promise<number> {
+    await this.ensureLoaded();
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    let deletedCount = 0;
+    for (const [key, event] of this.events.entries()) {
+      if (new Date(event.eventDate).getTime() < thirtyDaysAgo) {
+        this.events.delete(key);
+        deletedCount++;
+      }
+    }
+    if (deletedCount > 0) await this.persistEvents();
+    return deletedCount;
   }
 }
