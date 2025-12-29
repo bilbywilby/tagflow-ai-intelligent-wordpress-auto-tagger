@@ -1,19 +1,20 @@
-import { useState, forwardRef } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { RSSFeed } from '@/data/rssFeeds';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Copy, Check, ArrowRight, Rss } from 'lucide-react';
+import { ExternalLink, Copy, Check, ArrowRight, Rss } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/useAppStore';
 interface FeedCardProps {
   feed: RSSFeed;
   variant: 'grid' | 'list';
 }
-export const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(({ feed, variant }, ref) => {
-  const [copied, setCopied] = useState(false);
+export function FeedCard({ feed, variant }: FeedCardProps) {
+  const [copied, setCopied] = React.useState(false);
   const navigate = useNavigate();
   const setFeedUrl = useAppStore(s => s.setFeedUrl);
   const handleCopy = (e: React.MouseEvent) => {
@@ -30,7 +31,6 @@ export const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(({ feed, varia
   if (variant === 'list') {
     return (
       <motion.div
-        ref={ref}
         layout
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
@@ -63,7 +63,6 @@ export const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(({ feed, varia
   }
   return (
     <motion.div
-      ref={ref}
       layout
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
@@ -93,8 +92,8 @@ export const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(({ feed, varia
           </div>
         </CardContent>
         <CardFooter className="pt-4 border-t flex gap-2">
-          <Button
-            variant="outline"
+          <Button 
+            variant="outline" 
             className="flex-1 h-9 text-xs font-bold gap-2"
             onClick={handleCopy}
           >
@@ -104,7 +103,7 @@ export const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(({ feed, varia
               <><Copy className="h-3.5 w-3.5" /> Copy URL</>
             )}
           </Button>
-          <Button
+          <Button 
             className="flex-1 h-9 text-xs font-bold gap-2 bg-indigo-600 hover:bg-indigo-700"
             onClick={handleOpenStudio}
           >
@@ -115,5 +114,4 @@ export const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(({ feed, varia
       </Card>
     </motion.div>
   );
-});
-FeedCard.displayName = "FeedCard";
+}
