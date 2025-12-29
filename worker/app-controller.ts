@@ -1,6 +1,3 @@
-/**
- * CRITICAL SHIM: h3-js uses __dirname which is not available in Cloudflare Workers.
- */
 if (typeof (__dirname as any) === "undefined") {
   (globalThis as any).__dirname = "/";
 }
@@ -13,8 +10,8 @@ export class AppController extends DurableObject<Env> {
   private events = new Map<string, HubEvent>();
   private geofences = new Map<string, Geofence>();
   private landmarks = new Map<string, Landmark>();
-  private invertedH3Index = new Map<H3Index, Set<string>>(); // H3 -> Set of Geofence IDs
-  private landmarkH3Index = new Map<H3Index, Set<string>>(); // H3 -> Set of Landmark IDs
+  private invertedH3Index = new Map<H3Index, Set<string>>();
+  private landmarkH3Index = new Map<H3Index, Set<string>>();
   private briefing: MorningBriefing | null = null;
   private loaded = false;
   constructor(ctx: DurableObjectState, env: Env) {
@@ -32,36 +29,32 @@ export class AppController extends DurableObject<Env> {
       this.geofences = new Map(Object.entries(storedGeofences));
       this.landmarks = new Map(Object.entries(storedLandmarks));
       this.briefing = storedBriefing;
-      // Rebuild Spatial Index for Geofences
-      this.invertedH3Index.clear();
-      for (const fence of this.geofences.values()) {
-        if (fence.h3Indexes) {
-          for (const cellId of fence.h3Indexes) {
-            if (!this.invertedH3Index.has(cellId)) this.invertedH3Index.set(cellId, new Set());
-            this.invertedH3Index.get(cellId)!.add(fence.id);
-          }
-        }
-      }
-      // Rebuild Spatial Index for Landmarks
-      this.landmarkH3Index.clear();
-      for (const landmark of this.landmarks.values()) {
-        if (landmark.h3Index) {
-          if (!this.landmarkH3Index.has(landmark.h3Index)) this.landmarkH3Index.set(landmark.h3Index, new Set());
-          this.landmarkH3Index.get(landmark.h3Index)!.add(landmark.id);
-        }
-      }
+      this.rebuildSpatialIndices();
       this.loaded = true;
+    }
+  }
+  private rebuildSpatialIndices() {
+    this.invertedH3Index.clear();
+    for (const fence of this.geofences.values()) {
+      if (fence.h3Indexes) {
+        for (const cell of fence.h3Indexes) {
+          if (!this.invertedH3Index.has(cell)) this.invertedH3Index.set(cell, new Set());
+          this.invertedH3Index.get(cell)!.add(fence.id);
+        }
+      }
+    }
+    this.landmarkH3Index.clear();
+    for (const landmark of this.landmarks.values()) {
+      if (landmark.h3Index) {
+        if (!this.landmarkH3Index.has(landmark.h3Index)) this.landmarkH3Index.set(landmark.h3Index, new Set());
+        this.landmarkH3Index.get(landmark.h3Index)!.add(landmark.id);
+      }
     }
   }
   async upsertGeofence(fence: Geofence): Promise<void> {
     await this.ensureLoaded();
     this.geofences.set(fence.id, fence);
-    if (fence.h3Indexes) {
-      for (const cellId of fence.h3Indexes) {
-        if (!this.invertedH3Index.has(cellId)) this.invertedH3Index.set(cellId, new Set());
-        this.invertedH3Index.get(cellId)!.add(fence.id);
-      }
-    }
+    this.rebuildSpatialIndices();
     await this.ctx.storage.put('geofences', Object.fromEntries(this.geofences));
   }
   async listGeofences(): Promise<Geofence[]> {
@@ -71,37 +64,12 @@ export class AppController extends DurableObject<Env> {
   async upsertLandmark(landmark: Landmark): Promise<void> {
     await this.ensureLoaded();
     this.landmarks.set(landmark.id, landmark);
-    if (landmark.h3Index) {
-      if (!this.landmarkH3Index.has(landmark.h3Index)) this.landmarkH3Index.set(landmark.h3Index, new Set());
-      this.landmarkH3Index.get(landmark.h3Index)!.add(landmark.id);
-    }
+    this.rebuildSpatialIndices();
     await this.ctx.storage.put('landmarks', Object.fromEntries(this.landmarks));
   }
   async listLandmarks(): Promise<Landmark[]> {
     await this.ensureLoaded();
     return Array.from(this.landmarks.values());
-  }
-  async getLandmarksAt(lat: number, lng: number): Promise<Landmark[]> {
-    await this.ensureLoaded();
-    const cellId = h3.latLngToCell(lat, lng, 9);
-    const ids = this.landmarkH3Index.get(cellId);
-    if (!ids) return [];
-    return Array.from(ids).map(id => this.landmarks.get(id)!).filter(Boolean);
-  }
-  async getGeofencesAt(lat: number, lng: number): Promise<Geofence[]> {
-    await this.ensureLoaded();
-    const cellId = h3.latLngToCell(lat, lng, 9);
-    const ids = this.invertedH3Index.get(cellId);
-    if (!ids) return [];
-    return Array.from(ids).map(id => this.geofences.get(id)!).filter(Boolean);
-  }
-  async upsertEvent(event: HubEvent): Promise<void> {
-    await this.ensureLoaded();
-    const normalizedTitle = event.title.toLowerCase().trim().replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
-    const dateStr = new Date(event.eventDate).toISOString().split('T')[0];
-    const dedupKey = `${normalizedTitle}_${dateStr}`;
-    this.events.set(dedupKey, { ...event, id: event.id || crypto.randomUUID() });
-    await this.ctx.storage.put('hub_events', Object.fromEntries(this.events));
   }
   async listEvents(filters?: EventFilters): Promise<HubEvent[]> {
     await this.ensureLoaded();
@@ -110,20 +78,16 @@ export class AppController extends DurableObject<Env> {
       if (filters.category) results = results.filter(e => e.category === filters.category);
       if (filters.location) results = results.filter(e => e.location === filters.location);
       if (filters.neighborhoodId) results = results.filter(e => e.neighborhoodId === filters.neighborhoodId);
-      if (filters.neighborhood) results = results.filter(e => e.neighborhood === filters.neighborhood);
       if (filters.landmarkId) results = results.filter(e => e.landmarkId === filters.landmarkId);
-      if (filters.lat !== undefined && filters.lng !== undefined) {
-        const centerCell = h3.latLngToCell(filters.lat, filters.lng, 9);
-        const nearbyCells = new Set(h3.gridDisk(centerCell, 2));
-        results = results.filter(e => e.h3Index && nearbyCells.has(e.h3Index));
-      }
       if (filters.searchQuery) {
-        const query = filters.searchQuery.toLowerCase();
-        results = results.filter(e =>
-          e.title.toLowerCase().includes(query) ||
-          e.summary.toLowerCase().includes(query) ||
-          e.venue.toLowerCase().includes(query)
-        );
+        const q = filters.searchQuery.toLowerCase();
+        results = results.sort((a, b) => {
+          const aMatch = a.venue.toLowerCase().includes(q) || a.title.toLowerCase().includes(q);
+          const bMatch = b.venue.toLowerCase().includes(q) || b.title.toLowerCase().includes(q);
+          if (aMatch && !bMatch) return -1;
+          if (!aMatch && bMatch) return 1;
+          return 0;
+        }).filter(e => e.title.toLowerCase().includes(q) || e.venue.toLowerCase().includes(q));
       }
     }
     return results.sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
@@ -150,10 +114,15 @@ export class AppController extends DurableObject<Env> {
   }
   async getSyncStats() {
     await this.ensureLoaded();
+    const neighborhoodCounts: Record<string, number> = {};
+    this.events.forEach(e => {
+      if (e.neighborhood) neighborhoodCounts[e.neighborhood] = (neighborhoodCounts[e.neighborhood] || 0) + 1;
+    });
     return {
       total: this.events.size,
       geofences: this.geofences.size,
       landmarks: this.landmarks.size,
+      neighborhoods: neighborhoodCounts,
       lastSync: new Date().toISOString()
     };
   }
@@ -164,5 +133,12 @@ export class AppController extends DurableObject<Env> {
   async getMorningBriefing(): Promise<MorningBriefing | null> {
     await this.ensureLoaded();
     return this.briefing;
+  }
+  async getGeofencesAt(lat: number, lng: number): Promise<Geofence[]> {
+    await this.ensureLoaded();
+    const cell = h3.latLngToCell(lat, lng, 9);
+    const ids = this.invertedH3Index.get(cell);
+    if (!ids) return [];
+    return Array.from(ids).map(id => this.geofences.get(id)!).filter(Boolean);
   }
 }

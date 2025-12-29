@@ -7,6 +7,7 @@ export interface Geofence {
   canonicalPlace: HubLocation;
   aliases: string[];
   zipCodes: string[];
+  h3Indexes?: string[];
 }
 export interface Tag {
   id: string;
@@ -33,12 +34,25 @@ export interface HubEvent {
   venue: string;
   location: HubLocation;
   neighborhood?: string;
+  neighborhoodId?: string;
+  landmarkId?: string;
+  h3Index?: string;
   zipCode?: string;
   eventDate: string;
   category: HubCategory;
   summary: string;
   sourceUrl: string;
   createdAt: string;
+}
+export interface Landmark {
+  id: string;
+  name: string;
+  category: 'Sports' | 'Entertainment' | 'Education' | 'Culture' | 'Public' | 'Arts' | 'Government' | 'Retail';
+  address: string;
+  lat: number;
+  lng: number;
+  h3Index: string;
+  associatedGeofenceId?: string;
 }
 export interface MorningBriefing {
   id: string;
