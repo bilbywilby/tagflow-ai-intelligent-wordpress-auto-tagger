@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '@/store/useAppStore';
 import { RSS_FEEDS } from '@/data/rssFeeds';
@@ -21,7 +21,8 @@ export function Dashboard() {
   const selectedCategory = useAppStore(s => s.selectedCategory);
   const setSearchQuery = useAppStore(s => s.setSearchQuery);
   const setSelectedCategory = useAppStore(s => s.setSelectedCategory);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const viewMode = useAppStore(s => s.viewMode);
+  const setViewMode = useAppStore(s => s.setViewMode);
   const filteredFeeds = useMemo(() => {
     return RSS_FEEDS.filter(feed => {
       const matchesSearch =
@@ -31,8 +32,8 @@ export function Dashboard() {
       const matchesCategory = !selectedCategory || feed.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, selectedCategory]);
-  const featuredFeeds = useMemo(() => RSS_FEEDS.slice(0, 3), []);
+  }, [searchQuery, selectedCategory, RSS_FEEDS]);
+  const featuredFeeds = useMemo(() => RSS_FEEDS.slice(0, 3), [RSS_FEEDS]);
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
