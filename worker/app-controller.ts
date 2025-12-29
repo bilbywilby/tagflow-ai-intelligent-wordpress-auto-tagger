@@ -2,7 +2,7 @@ if (typeof (__dirname as any) === "undefined") {
   (globalThis as any).__dirname = "/";
 }
 import { DurableObject } from 'cloudflare:workers';
-import type { SessionInfo, HubEvent, MorningBriefing, HubLocation, HubCategory, Geofence, EventFilters, H3Index, Landmark } from './types';
+import type { SessionInfo, HubEvent, MorningBriefing, HubLocation, Geofence, EventFilters, H3Index, Landmark } from './types';
 import type { Env } from './core-utils';
 import * as h3 from 'h3-js';
 export class AppController extends DurableObject<Env> {
@@ -71,6 +71,18 @@ export class AppController extends DurableObject<Env> {
     await this.ensureLoaded();
     return Array.from(this.landmarks.values());
   }
+  async upsertEvent(event: HubEvent): Promise<void> {
+    await this.ensureLoaded();
+    this.events.set(event.id, event);
+    // Prune events older than 7 days to keep DO state lean
+    const cutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
+    for (const [id, e] of this.events.entries()) {
+      if (new Date(e.createdAt).getTime() < cutoff) {
+        this.events.delete(id);
+      }
+    }
+    await this.ctx.storage.put('hub_events', Object.fromEntries(this.events));
+  }
   async listEvents(filters?: EventFilters): Promise<HubEvent[]> {
     await this.ensureLoaded();
     let results = Array.from(this.events.values());
@@ -81,13 +93,11 @@ export class AppController extends DurableObject<Env> {
       if (filters.landmarkId) results = results.filter(e => e.landmarkId === filters.landmarkId);
       if (filters.searchQuery) {
         const q = filters.searchQuery.toLowerCase();
-        results = results.sort((a, b) => {
-          const aMatch = a.venue.toLowerCase().includes(q) || a.title.toLowerCase().includes(q);
-          const bMatch = b.venue.toLowerCase().includes(q) || b.title.toLowerCase().includes(q);
-          if (aMatch && !bMatch) return -1;
-          if (!aMatch && bMatch) return 1;
-          return 0;
-        }).filter(e => e.title.toLowerCase().includes(q) || e.venue.toLowerCase().includes(q));
+        results = results.filter(e => 
+          e.title.toLowerCase().includes(q) || 
+          e.venue.toLowerCase().includes(q) ||
+          e.summary.toLowerCase().includes(q)
+        );
       }
     }
     return results.sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
@@ -127,8 +137,12 @@ export class AppController extends DurableObject<Env> {
     };
   }
   async saveMorningBriefing(briefing: MorningBriefing): Promise<void> {
-    this.briefing = briefing;
-    await this.ctx.storage.put('morning_briefing', briefing);
+    await this.ensureLoaded();
+    // Only save if newer or first one
+    if (!this.briefing || new Date(briefing.date).getTime() > new Date(this.briefing.date).getTime()) {
+      this.briefing = briefing;
+      await this.ctx.storage.put('morning_briefing', briefing);
+    }
   }
   async getMorningBriefing(): Promise<MorningBriefing | null> {
     await this.ensureLoaded();
