@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '@/store/useAppStore';
-import { RSS_FEEDS } from '@/data/rssFeeds';
+import { RSS_FEEDS } from '@/data/rssFeEDS';
 import { FeedCard } from '@/components/FeedCard';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,9 +13,12 @@ import {
   Newspaper,
   FilterX,
   ArrowRight,
-  TrendingUp
+  TrendingUp,
+  Loader2,
+  CheckCircle
 } from 'lucide-react';
 import { exportFeedsToOPML } from '@/lib/opml';
+import { toast } from 'sonner';
 export function Dashboard() {
   const searchQuery = useAppStore(s => s.searchQuery);
   const selectedCategory = useAppStore(s => s.selectedCategory);
@@ -23,6 +26,7 @@ export function Dashboard() {
   const setSelectedCategory = useAppStore(s => s.setSelectedCategory);
   const viewMode = useAppStore(s => s.viewMode);
   const setViewMode = useAppStore(s => s.setViewMode);
+  const [isExporting, setIsExporting] = useState(false);
   const filteredFeeds = useMemo(() => {
     return RSS_FEEDS.filter(feed => {
       const matchesSearch =
@@ -34,6 +38,20 @@ export function Dashboard() {
     });
   }, [searchQuery, selectedCategory]);
   const featuredFeeds = useMemo(() => RSS_FEEDS.slice(0, 3), []);
+  const handleExport = async () => {
+    setIsExporting(true);
+    // Artificial delay for UX feel
+    await new Promise(r => setTimeout(r, 800));
+    const success = exportFeedsToOPML(RSS_FEEDS);
+    setIsExporting(false);
+    if (success) {
+      toast.success('Professional OPML Export Complete', {
+        description: 'Your category-grouped directory is ready for Feedly/Inoreader.',
+      });
+    } else {
+      toast.error('Export failed');
+    }
+  };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
@@ -44,10 +62,10 @@ export function Dashboard() {
                 Feed <span className="text-indigo-600">Explorer</span>
               </h1>
               <p className="text-muted-foreground text-lg">
-                The ultimate directory of Lehigh Valley news and media sources.
+                The ultimate directory of {RSS_FEEDS.length} Lehigh Valley news and media sources.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <div className="bg-secondary/50 rounded-lg p-1 flex items-center border">
                 <Button
                   variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
@@ -67,11 +85,16 @@ export function Dashboard() {
                 </Button>
               </div>
               <Button
-                onClick={() => exportFeedsToOPML(RSS_FEEDS)}
-                className="bg-indigo-600 hover:bg-indigo-700 font-bold transition-all shadow-md gap-2"
+                onClick={handleExport}
+                disabled={isExporting}
+                className="bg-indigo-600 hover:bg-indigo-700 font-bold transition-all shadow-md gap-2 h-10 px-4"
               >
-                <Download className="h-4 w-4" />
-                Export OPML
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {isExporting ? 'Generating...' : 'Export OPML'}
               </Button>
             </div>
           </div>
@@ -101,11 +124,11 @@ export function Dashboard() {
                    <TrendingUp className="h-5 w-5" />
                  </div>
                  <div>
-                   <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Live Status</p>
-                   <p className="text-sm font-bold">{RSS_FEEDS.length} Regional Sources</p>
+                   <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Global Status</p>
+                   <p className="text-sm font-bold">{RSS_FEEDS.length} Active Sources</p>
                  </div>
                </div>
-               <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+               <CheckCircle className="h-4 w-4 text-emerald-500" />
             </div>
           </div>
           {selectedCategory && (
@@ -125,7 +148,7 @@ export function Dashboard() {
             <section className="space-y-6">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <Newspaper className="h-5 w-5 text-indigo-500" />
-                Featured Regional Sources
+                Regional Favorites
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {featuredFeeds.map(feed => (
@@ -136,7 +159,7 @@ export function Dashboard() {
           )}
           <section className="space-y-6">
             <h2 className="text-xl font-bold">
-              {searchQuery || selectedCategory ? 'Search Results' : 'Full Directory'}
+              {searchQuery || selectedCategory ? 'Matching Intelligence Nodes' : 'Regional Source Directory'}
             </h2>
             {filteredFeeds.length > 0 ? (
               <div className={viewMode === 'grid'
@@ -158,16 +181,16 @@ export function Dashboard() {
                 <div className="w-20 h-20 rounded-3xl bg-secondary flex items-center justify-center mb-6">
                   <Newspaper className="h-10 w-10 text-muted-foreground" />
                 </div>
-                <h2 className="text-2xl font-bold mb-2">No matching feeds</h2>
+                <h2 className="text-2xl font-bold mb-2">Target Node Not Found</h2>
                 <p className="text-muted-foreground max-w-md mx-auto mb-8">
-                  We couldn't find any regional sources matching your current search criteria.
+                  We couldn't find any regional sources matching your current parameters.
                 </p>
                 <Button
                   variant="outline"
                   onClick={() => {setSearchQuery(''); setSelectedCategory(null);}}
-                  className="gap-2"
+                  className="gap-2 rounded-xl"
                 >
-                  Reset All Filters
+                  Clear Intelligence Filters
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
