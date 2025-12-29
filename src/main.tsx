@@ -12,6 +12,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css'
 import App from '@/App'
+import { Hub } from '@/pages/Hub';
 import { Dashboard } from '@/pages/Dashboard';
 import TaggingStudio from '@/pages/TaggingStudio';
 import { Settings } from '@/pages/Settings';
@@ -24,6 +25,10 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
+        element: <Hub />,
+      },
+      {
+        path: "explorer",
         element: <Dashboard />,
       },
       {

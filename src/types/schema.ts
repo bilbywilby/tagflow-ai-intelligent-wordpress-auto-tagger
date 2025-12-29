@@ -1,4 +1,6 @@
 export type TaggingStatus = 'pending' | 'analyzing' | 'tagged' | 'syncing' | 'synced' | 'error';
+export type HubCategory = 'Family' | 'Nightlife' | 'Arts' | 'News' | 'General';
+export type HubLocation = 'Allentown' | 'Bethlehem' | 'Easton' | 'Greater LV' | 'Other';
 export interface Tag {
   id: string;
   name: string;
@@ -17,6 +19,23 @@ export interface Article {
   tags: Tag[];
   status: TaggingStatus;
   error?: string;
+}
+export interface HubEvent {
+  id: string;
+  title: string;
+  venue: string;
+  location: HubLocation;
+  eventDate: string;
+  category: HubCategory;
+  summary: string;
+  sourceUrl: string;
+  createdAt: string;
+}
+export interface MorningBriefing {
+  id: string;
+  date: string;
+  content: string;
+  highlightCount: number;
 }
 export interface AppSettings {
   wpApiUrl: string;

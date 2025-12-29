@@ -1,9 +1,12 @@
 import { create } from 'zustand';
-import { Article, AppSettings } from '@/types/schema';
+import { Article, AppSettings, HubEvent, MorningBriefing } from '@/types/schema';
 interface AppState {
   articles: Article[];
+  events: HubEvent[];
+  briefing: MorningBriefing | null;
   feedUrl: string;
   isLoading: boolean;
+  isCurating: boolean;
   settings: AppSettings;
   searchQuery: string;
   selectedCategory: string | null;
@@ -14,6 +17,9 @@ interface AppState {
   updateArticle: (id: string, updates: Partial<Article>) => void;
   updateArticles: (ids: string[], updates: Partial<Article>) => void;
   clearArticles: () => void;
+  setEvents: (events: HubEvent[]) => void;
+  setBriefing: (briefing: MorningBriefing | null) => void;
+  setCurating: (curating: boolean) => void;
   setFeedUrl: (url: string) => void;
   setLoading: (loading: boolean) => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
@@ -23,8 +29,11 @@ interface AppState {
 }
 export const useAppStore = create<AppState>((set) => ({
   articles: [],
+  events: [],
+  briefing: null,
   feedUrl: '',
   isLoading: false,
+  isCurating: false,
   searchQuery: '',
   selectedCategory: null,
   viewMode: 'grid',
@@ -45,6 +54,9 @@ export const useAppStore = create<AppState>((set) => ({
     articles: state.articles.map((a) => (ids.includes(a.id) ? { ...a, ...updates } : a)),
   })),
   clearArticles: () => set({ articles: [] }),
+  setEvents: (events) => set({ events }),
+  setBriefing: (briefing) => set({ briefing }),
+  setCurating: (isCurating) => set({ isCurating }),
   setFeedUrl: (feedUrl) => set({ feedUrl }),
   setLoading: (isLoading) => set({ isLoading }),
   updateSettings: (settings) => set((state) => ({
@@ -52,5 +64,5 @@ export const useAppStore = create<AppState>((set) => ({
   })),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setSelectedCategory: (selectedCategory) => set({ selectedCategory }),
-  setViewMode: (viewMode: 'grid' | 'list') => set({ viewMode }),
+  setViewMode: (viewMode) => set({ viewMode }),
 }));

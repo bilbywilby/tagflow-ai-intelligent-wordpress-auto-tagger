@@ -3,10 +3,11 @@ import {
   LayoutDashboard,
   Sparkles,
   Settings,
-  BookOpen,
   Info,
   ChevronRight,
-  Hash
+  Hash,
+  Globe,
+  Hammer
 } from "lucide-react";
 import {
   Sidebar,
@@ -33,6 +34,7 @@ export function AppSidebar(): JSX.Element {
   const location = useLocation();
   const selectedCategory = useAppStore(s => s.selectedCategory);
   const setSelectedCategory = useAppStore(s => s.setSelectedCategory);
+  const events = useAppStore(s => s.events);
   const getFeedCount = (category: string) => {
     return RSS_FEEDS.filter(f => f.category === category).length;
   };
@@ -45,7 +47,7 @@ export function AppSidebar(): JSX.Element {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel className="px-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
-            Explorer
+            Regional Hub
           </SidebarGroupLabel>
           <SidebarMenu className="px-2 mt-2 gap-1">
             <SidebarMenuItem>
@@ -54,58 +56,37 @@ export function AppSidebar(): JSX.Element {
                 isActive={location.pathname === "/"}
                 className={cn(
                   "h-11 px-3 rounded-xl transition-all",
-                  location.pathname === "/" && !selectedCategory ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400 font-bold" : ""
+                  location.pathname === "/" ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400 font-bold" : ""
                 )}
-                onClick={() => setSelectedCategory(null)}
               >
                 <Link to="/">
-                  <LayoutDashboard className="size-5" />
-                  <span>Full Directory</span>
+                  <Globe className="size-5" />
+                  <span>Lehigh Valley Hub</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <Collapsible defaultOpen className="group/collapsible">
-              <SidebarMenuItem>
-                <CollapsibleTrigger asChild>
-                  <SidebarMenuButton className="h-11 px-3 rounded-xl hover:bg-accent/50">
-                    <Hash className="size-5 text-muted-foreground" />
-                    <span>Categories</span>
-                    <ChevronRight className="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
-                  </SidebarMenuButton>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="flex flex-col gap-1 mt-1 pl-4 pr-2">
-                    {CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        onClick={() => {
-                          setSelectedCategory(cat);
-                          // Ensure we're on the dashboard
-                          if(location.pathname !== "/") window.location.href = "/";
-                        }}
-                        className={cn(
-                          "flex items-center justify-between px-3 py-2 text-xs rounded-lg transition-colors text-left",
-                          selectedCategory === cat 
-                            ? "bg-indigo-100/50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300 font-bold"
-                            : "text-muted-foreground hover:bg-accent/30 hover:text-foreground"
-                        )}
-                      >
-                        <span className="truncate">{cat}</span>
-                        <span className="text-[10px] opacity-50 bg-secondary px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
-                          {getFeedCount(cat)}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </SidebarMenuItem>
-            </Collapsible>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={location.pathname === "/explorer"}
+                className={cn(
+                  "h-11 px-3 rounded-xl transition-all",
+                  location.pathname === "/explorer" && !selectedCategory ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400 font-bold" : ""
+                )}
+                onClick={() => setSelectedCategory(null)}
+              >
+                <Link to="/explorer">
+                  <LayoutDashboard className="size-5" />
+                  <span>Feed Explorer</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
         <SidebarSeparator />
         <SidebarGroup>
           <SidebarGroupLabel className="px-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
-            Tools
+            Curator Tools
           </SidebarGroupLabel>
           <SidebarMenu className="px-2 mt-2 gap-1">
             <SidebarMenuItem>
@@ -144,11 +125,11 @@ export function AppSidebar(): JSX.Element {
       <SidebarFooter className="p-4">
         <div className="bg-indigo-600/5 dark:bg-indigo-500/5 rounded-2xl p-4 border border-indigo-500/10">
           <div className="flex items-center gap-2 mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-600/80 dark:text-indigo-400">
-            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Regional Feed Active
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Intelligence Active
           </div>
           <p className="text-[10px] text-muted-foreground leading-relaxed">
-            v{RSS_FEEDS.length} items verified
+            {events.length} regional items curated. Next briefing tomorrow 6AM.
           </p>
         </div>
       </SidebarFooter>
