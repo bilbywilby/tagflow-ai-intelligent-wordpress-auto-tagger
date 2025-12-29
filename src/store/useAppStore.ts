@@ -7,6 +7,7 @@ interface AppState {
   settings: AppSettings;
   searchQuery: string;
   selectedCategory: string | null;
+  viewMode: 'grid' | 'list';
   // Actions
   setArticles: (articles: Article[]) => void;
   addArticles: (articles: Article[]) => void;
@@ -18,6 +19,7 @@ interface AppState {
   updateSettings: (settings: Partial<AppSettings>) => void;
   setSearchQuery: (query: string) => void;
   setSelectedCategory: (category: string | null) => void;
+  setViewMode: (mode: 'grid' | 'list') => void;
 }
 export const useAppStore = create<AppState>((set) => ({
   articles: [],
@@ -25,6 +27,7 @@ export const useAppStore = create<AppState>((set) => ({
   isLoading: false,
   searchQuery: '',
   selectedCategory: null,
+  viewMode: 'grid',
   settings: {
     wpApiUrl: 'https://demo.wordpress.org/wp-json',
     wpApiKey: '',
@@ -49,4 +52,5 @@ export const useAppStore = create<AppState>((set) => ({
   })),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setSelectedCategory: (selectedCategory) => set({ selectedCategory }),
+  setViewMode: (viewMode: 'grid' | 'list') => set({ viewMode }),
 }));
