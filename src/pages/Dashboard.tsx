@@ -32,8 +32,8 @@ export function Dashboard() {
       const matchesCategory = !selectedCategory || feed.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, selectedCategory, RSS_FEEDS]);
-  const featuredFeeds = useMemo(() => RSS_FEEDS.slice(0, 3), [RSS_FEEDS]);
+  }, [searchQuery, selectedCategory]);
+  const featuredFeeds = useMemo(() => RSS_FEEDS.slice(0, 3), []);
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
