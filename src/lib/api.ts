@@ -1,4 +1,4 @@
-import { Article, Tag, HubEvent, MorningBriefing, HubLocation, HubCategory, Geofence } from '@/types/schema';
+import { Article, Tag, HubEvent, MorningBriefing, HubLocation, HubCategory, Geofence, Landmark } from '@/types/schema';
 export async function fetchFeed(url: string): Promise<Article[]> {
   const res = await fetch('/api/rss/fetch', {
     method: 'POST',
@@ -35,6 +35,7 @@ export async function fetchEvents(filters: {
   q?: string;
   neighborhood?: string;
   neighborhoodId?: string;
+  landmarkId?: string;
   lat?: number;
   lng?: number;
 } = {}): Promise<HubEvent[]> {
@@ -44,11 +45,24 @@ export async function fetchEvents(filters: {
   if (filters.q) params.append('q', filters.q);
   if (filters.neighborhood) params.append('neighborhood', filters.neighborhood);
   if (filters.neighborhoodId) params.append('neighborhoodId', filters.neighborhoodId);
+  if (filters.landmarkId) params.append('landmarkId', filters.landmarkId);
   if (filters.lat) params.append('lat', filters.lat.toString());
   if (filters.lng) params.append('lng', filters.lng.toString());
   const res = await fetch(`/api/hub/events?${params.toString()}`);
   const json = await res.json();
   if (!json.success) throw new Error(json.error || 'Failed to fetch hub events');
+  return json.data;
+}
+export async function fetchGeofences(): Promise<Geofence[]> {
+  const res = await fetch('/api/hub/geofences');
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to fetch geofences');
+  return json.data;
+}
+export async function fetchLandmarks(): Promise<Landmark[]> {
+  const res = await fetch('/api/hub/landmarks');
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'Failed to fetch landmarks');
   return json.data;
 }
 export async function fetchNeighborhoodAt(lat: number, lng: number): Promise<Geofence[]> {

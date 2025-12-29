@@ -14,16 +14,25 @@ export interface ErrorResult {
 }
 export type HubCategory = 'Family' | 'Nightlife' | 'Arts' | 'News' | 'General';
 export type HubLocation = 'Allentown' | 'Bethlehem' | 'Easton' | 'Greater LV' | 'Other';
+export interface Landmark {
+  id: string;
+  name: string;
+  category: 'Sports' | 'Entertainment' | 'Education' | 'Culture' | 'Public';
+  address: string;
+  lat: number;
+  lng: number;
+  h3Index: H3Index;
+  associatedGeofenceId?: string;
+}
 export interface Geofence {
   id: string;
   name: string;
   canonicalPlace: HubLocation;
   aliases: string[];
   zipCodes: string[];
-  // H3 Extensions
   h3Indexes?: H3Index[];
   centroid?: { lat: number; lng: number };
-  bbox?: [number, number, number, number]; // [minLng, minLat, maxLng, maxLat]
+  bbox?: [number, number, number, number];
 }
 export interface HubEvent {
   id: string;
@@ -31,8 +40,9 @@ export interface HubEvent {
   venue: string;
   location: HubLocation;
   neighborhood?: string;
-  neighborhoodId?: string; // H3 Relational ID
-  h3Index?: H3Index;       // Precision cell
+  neighborhoodId?: string;
+  landmarkId?: string;
+  h3Index?: H3Index;
   zipCode?: string;
   eventDate: string;
   category: HubCategory;
@@ -77,8 +87,9 @@ export interface EventFilters {
   location?: HubLocation;
   neighborhood?: string;
   neighborhoodId?: string;
+  landmarkId?: string;
   searchQuery?: string;
   lat?: number;
   lng?: number;
-  radius?: number; // In H3 cells or KM
+  radius?: number;
 }
