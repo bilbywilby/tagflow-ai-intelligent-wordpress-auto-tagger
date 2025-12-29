@@ -1,6 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { SessionInfo, HubEvent, MorningBriefing } from './types';
+import type { SessionInfo, HubEvent, MorningBriefing, HubLocation, HubCategory } from './types';
 import type { Env } from './core-utils';
+export interface EventFilters {
+  category?: HubCategory;
+  location?: HubLocation;
+  searchQuery?: string;
+}
 export class AppController extends DurableObject<Env> {
   private sessions = new Map<string, SessionInfo>();
   private events = new Map<string, HubEvent>();
@@ -55,17 +60,33 @@ export class AppController extends DurableObject<Env> {
     await this.ensureLoaded();
     return Array.from(this.sessions.values()).sort((a, b) => b.lastActive - a.lastActive);
   }
-  // --- Hub Event Persistence (D1 Simulation) ---
   async upsertEvent(event: HubEvent): Promise<void> {
     await this.ensureLoaded();
-    // Deduplication by normalized title and date
-    const dedupKey = `${event.title.toLowerCase().trim()}_${event.eventDate}`;
+    const normalizedTitle = event.title.toLowerCase().trim().replace(/[^\w\s]/gi, '');
+    const dedupKey = `${normalizedTitle}_${new Date(event.eventDate).toISOString().split('T')[0]}`;
     this.events.set(dedupKey, { ...event, id: event.id || crypto.randomUUID() });
     await this.persistEvents();
   }
-  async listEvents(): Promise<HubEvent[]> {
+  async listEvents(filters?: EventFilters): Promise<HubEvent[]> {
     await this.ensureLoaded();
-    return Array.from(this.events.values()).sort((a, b) => 
+    let results = Array.from(this.events.values());
+    if (filters) {
+      if (filters.category) {
+        results = results.filter(e => e.category === filters.category);
+      }
+      if (filters.location) {
+        results = results.filter(e => e.location === filters.location);
+      }
+      if (filters.searchQuery) {
+        const query = filters.searchQuery.toLowerCase();
+        results = results.filter(e => 
+          e.title.toLowerCase().includes(query) || 
+          e.summary.toLowerCase().includes(query) ||
+          e.venue.toLowerCase().includes(query)
+        );
+      }
+    }
+    return results.sort((a, b) =>
       new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime()
     );
   }

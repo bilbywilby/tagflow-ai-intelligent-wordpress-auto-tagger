@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Article, AppSettings, HubEvent, MorningBriefing } from '@/types/schema';
+import { Article, AppSettings, HubEvent, MorningBriefing, HubLocation } from '@/types/schema';
 interface AppState {
   articles: Article[];
   events: HubEvent[];
@@ -11,6 +11,9 @@ interface AppState {
   searchQuery: string;
   selectedCategory: string | null;
   viewMode: 'grid' | 'list';
+  // Hub Filters
+  hubSearchQuery: string;
+  hubSelectedLocation: HubLocation | null;
   // Actions
   setArticles: (articles: Article[]) => void;
   addArticles: (articles: Article[]) => void;
@@ -26,6 +29,8 @@ interface AppState {
   setSearchQuery: (query: string) => void;
   setSelectedCategory: (category: string | null) => void;
   setViewMode: (mode: 'grid' | 'list') => void;
+  setHubSearchQuery: (query: string) => void;
+  setHubSelectedLocation: (location: HubLocation | null) => void;
 }
 export const useAppStore = create<AppState>((set) => ({
   articles: [],
@@ -37,6 +42,8 @@ export const useAppStore = create<AppState>((set) => ({
   searchQuery: '',
   selectedCategory: null,
   viewMode: 'grid',
+  hubSearchQuery: '',
+  hubSelectedLocation: null,
   settings: {
     wpApiUrl: 'https://demo.wordpress.org/wp-json',
     wpApiKey: '',
@@ -65,4 +72,6 @@ export const useAppStore = create<AppState>((set) => ({
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setSelectedCategory: (selectedCategory) => set({ selectedCategory }),
   setViewMode: (viewMode) => set({ viewMode }),
+  setHubSearchQuery: (hubSearchQuery) => set({ hubSearchQuery }),
+  setHubSelectedLocation: (hubSelectedLocation) => set({ hubSelectedLocation }),
 }));
