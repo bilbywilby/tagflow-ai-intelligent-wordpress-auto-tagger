@@ -83,7 +83,8 @@ function runSetupCommands() {
     "bun add lucide-react date-fns zustand",
     "bun add rss-parser uuid",
     "bun add date-fns",
-    "bun add h3-js"
+    "bun add h3-js",
+    "bun add string-similarity"
 ];
     
     if (commands.length === 0) {
