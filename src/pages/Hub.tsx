@@ -52,14 +52,14 @@ export function Hub() {
     } catch (e) {
       toast.error("Failed to load Lehigh Valley intelligence");
     }
-  }, [hubSelectedLocation, hubSearchQuery, hubSelectedNeighborhood, selectedLandmarkId, setEvents, setHubStats, setGeofences]);
+  }, [hubSelectedLocation, hubSearchQuery, hubSelectedNeighborhood, selectedLandmarkId, setEvents, setHubStats, setGeofences, setLandmarks]);
   const loadBriefing = React.useCallback(async () => {
     setIsBriefingLoading(true);
     try {
       const briefingData = await fetchBriefing();
       setBriefing(briefingData);
     } catch (e) {
-      console.error("Briefing load failed");
+      toast.error('Failed to load morning briefing');
     } finally {
       setIsBriefingLoading(false);
     }
