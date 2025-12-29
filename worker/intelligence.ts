@@ -1,9 +1,10 @@
 import OpenAI from "openai";
 import Parser from "rss-parser";
 import type { Env } from "./core-utils";
-import type { HubEvent, HubLocation, HubCategory } from "./types";
+import type { HubEvent, HubLocation, HubCategory, Landmark } from "./types";
 import { resolveNeighborhood, extractZipCode } from "./geofences";
 import { latLngToH3, resolveZipToCoords } from "./geofences-h3";
+import { resolveVenueToLandmark } from "./gazetteer";
 const parser = new Parser({
   customFields: {
     item: [['media:content', 'mediaContent'], ['content:encoded', 'contentEncoded']]
@@ -14,7 +15,7 @@ export const LEHIGH_VALLEY_SOURCES = [
   { name: "Lehigh Valley News Top", url: "https://www.lehighvalleynews.com/index.rss", locationHint: "Greater LV", categoryPreference: "General" },
   { name: "Discover Lehigh Valley", url: "https://www.discoverlehighvalley.com/blog/rss/", locationHint: "Greater LV", categoryPreference: "Arts" }
 ];
-export async function normalizeContent(openai: OpenAI, title: string, content: string): Promise<{
+export async function normalizeContent(openai: OpenAI, title: string, content: string, landmarks: Landmark[]): Promise<{
   summary: string;
   venue: string;
   location: HubLocation;
@@ -22,6 +23,7 @@ export async function normalizeContent(openai: OpenAI, title: string, content: s
   category: HubCategory;
   zipCode?: string;
   h3Index?: string;
+  landmarkId?: string;
 }> {
   const prompt = `Act as a Lehigh Valley Regional Analyst.
   Extract structured metadata.
@@ -39,9 +41,12 @@ export async function normalizeContent(openai: OpenAI, title: string, content: s
     });
     const data = JSON.parse(completion.choices[0].message.content || "{}");
     const zipCode = extractZipCode(`${content} ${title}`);
-    // Spatial Resolution
-    let h3Index;
-    if (zipCode) {
+    // Spatial Resolution via Gazetteer
+    const landmark = resolveVenueToLandmark(data.venue || title, landmarks);
+    let h3Index = landmark?.h3Index;
+    let landmarkId = landmark?.id;
+    // Fallback to Zip if no landmark
+    if (!h3Index && zipCode) {
       const coords = resolveZipToCoords(zipCode);
       if (coords) h3Index = latLngToH3(coords[0], coords[1], 9);
     }
@@ -52,7 +57,8 @@ export async function normalizeContent(openai: OpenAI, title: string, content: s
       neighborhood: data.neighborhood,
       category: (data.category as HubCategory) || "News",
       zipCode,
-      h3Index
+      h3Index,
+      landmarkId
     };
   } catch (e) {
     return { summary: title, venue: "Lehigh Valley", location: "Greater LV", category: "News" };
@@ -62,14 +68,14 @@ export async function runProSync(env: Env, controller: any) {
   const openai = new OpenAI({ baseURL: env.CF_AI_BASE_URL, apiKey: env.CF_AI_API_KEY });
   let totalIngested = 0;
   const geofences = await controller.listGeofences();
+  const landmarks = await controller.listLandmarks();
   for (const source of LEHIGH_VALLEY_SOURCES) {
     try {
       const res = await fetch(source.url);
       if (!res.ok) continue;
       const feed = await parser.parseString(await res.text());
       for (const item of feed.items.slice(0, 5)) {
-        const normalized = await normalizeContent(openai, item.title || "", item.contentSnippet || "");
-        // Find Neighborhood ID via Spatial or Text Fallback
+        const normalized = await normalizeContent(openai, item.title || "", item.contentSnippet || "", landmarks);
         let neighborhoodId;
         if (normalized.neighborhood) {
           const matched = geofences.find((f: any) => f.name.toLowerCase() === normalized.neighborhood?.toLowerCase());
@@ -82,6 +88,7 @@ export async function runProSync(env: Env, controller: any) {
           location: normalized.location,
           neighborhood: normalized.neighborhood,
           neighborhoodId,
+          landmarkId: normalized.landmarkId,
           h3Index: normalized.h3Index,
           category: normalized.category,
           summary: normalized.summary,
@@ -92,7 +99,9 @@ export async function runProSync(env: Env, controller: any) {
         await controller.upsertEvent(event);
         totalIngested++;
       }
-    } catch (err) {}
+    } catch (err) {
+      console.error("Sync Error for source:", source.name, err);
+    }
   }
   return totalIngested;
 }
