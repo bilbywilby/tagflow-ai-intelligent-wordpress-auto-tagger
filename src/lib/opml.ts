@@ -1,9 +1,26 @@
 import { RSSFeed } from '@/data/rssFeeds';
 /**
- * Escapes special characters for XML compliance.
+ * Generates an OPML XML string from a list of RSS feeds.
  */
+export function generateOPML(feeds: RSSFeed[]): string {
+  const dateStr = new Date().toUTCString();
+  const outlines = feeds.map(feed => {
+    return `    <outline text="${escapeXml(feed.title)}" title="${escapeXml(feed.title)}" type="rss" xmlUrl="${escapeXml(feed.url)}" htmlUrl="${escapeXml(feed.url)}" category="${escapeXml(feed.category)}" description="${escapeXml(feed.description)}" />`;
+  }).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>Lehigh Valley RSS Feeds Directory</title>
+    <dateCreated>${dateStr}</dateCreated>
+  </head>
+  <body>
+    <outline text="Lehigh Valley Feeds" title="Lehigh Valley Feeds">
+${outlines}
+    </outline>
+  </body>
+</opml>`;
+}
 function escapeXml(unsafe: string): string {
-  if (!unsafe) return '';
   return unsafe.replace(/[<>&"']/g, (c) => {
     switch (c) {
       case '<': return '&lt;';
@@ -16,62 +33,17 @@ function escapeXml(unsafe: string): string {
   });
 }
 /**
- * Generates an OPML 2.0 XML string from a list of RSS feeds, grouped by category.
- */
-export function generateOPML(feeds: RSSFeed[]): string {
-  const dateStr = new Date().toUTCString();
-  // Group feeds by category
-  const groups: Record<string, RSSFeed[]> = {};
-  feeds.forEach(feed => {
-    if (!groups[feed.category]) {
-      groups[feed.category] = [];
-    }
-    groups[feed.category].push(feed);
-  });
-  const categories = Object.keys(groups).sort();
-  const bodyContent = categories.map(category => {
-    const categoryFeeds = groups[category];
-    const categoryTitle = escapeXml(category);
-    const feedOutlines = categoryFeeds.map(feed => {
-      const title = escapeXml(feed.title);
-      const xmlUrl = escapeXml(feed.url);
-      const desc = escapeXml(feed.description);
-      return `      <outline type="rss" text="${title}" title="${title}" xmlUrl="${xmlUrl}" htmlUrl="${xmlUrl}" description="${desc}" />`;
-    }).join('\n');
-    return `    <outline text="${categoryTitle}" title="${categoryTitle}">
-${feedOutlines}
-    </outline>`;
-  }).join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<opml version="2.0">
-  <head>
-    <title>Lehigh Valley Regional Intelligence Directory</title>
-    <dateCreated>${dateStr}</dateCreated>
-    <ownerName>TagFlow AI</ownerName>
-  </head>
-  <body>
-${bodyContent}
-  </body>
-</opml>`;
-}
-/**
- * Generates and triggers a download for the professional OPML file.
+ * Generates and triggers a download for the OPML file.
  */
 export function exportFeedsToOPML(feeds: RSSFeed[]) {
-  try {
-    const opmlContent = generateOPML(feeds);
-    const blob = new Blob([opmlContent], { type: 'text/xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `lehigh-valley-intelligence-${new Date().toISOString().split('T')[0]}.opml`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    return true;
-  } catch (error) {
-    console.error('OPML Export Failed:', error);
-    return false;
-  }
+  const opmlContent = generateOPML(feeds);
+  const blob = new Blob([opmlContent], { type: 'text/xml' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'lehigh-valley-feeds.opml';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }

@@ -37,16 +37,17 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
               return c.json({ success: true, data: [], message: "No articles found in this feed." });
             }
             const items = feed.items.map(item => {
-                const itemAny = item as any;
+                // Use explicit any cast to handle varying RSS field structures and avoid TS2339
+                const it = item as any;
                 return {
                     id: crypto.randomUUID(),
                     title: item.title || "Untitled",
                     url: item.link || "",
-                    excerpt: (item.contentSnippet || itemAny.description || "").slice(0, 200).replace(/<[^>]*>?/gm, '') + "...",
-                    content: itemAny.contentEncoded || item.content || itemAny.description || "",
-                    author: itemAny.creator || item.author || "Unknown Author",
+                    excerpt: (item.contentSnippet || it.description || "").slice(0, 200).replace(/<[^>]*>?/gm, '') + "...",
+                    content: it.contentEncoded || item.content || it.description || "",
+                    author: it.creator || it.author || "Staff Writer",
                     publishedDate: item.pubDate || item.isoDate || new Date().toISOString(),
-                    thumbnail: item.enclosure?.url || itemAny.mediaContent?.$?.url || "",
+                    thumbnail: item.enclosure?.url || it.mediaContent?.$?.url || "",
                     tags: [],
                     status: 'pending'
                 };
@@ -97,6 +98,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
      */
     app.post('/api/sync', async (c) => {
         const { articleId, tags } = await c.req.json();
+        // Artificial delay for realism
         await new Promise(r => setTimeout(r, 1200));
         return c.json({ success: true, message: `Successfully pushed ${tags.length} tags to WP database.` });
     });
