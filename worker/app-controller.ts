@@ -1,10 +1,6 @@
-if (typeof (__dirname as any) === "undefined") {
-  (globalThis as any).__dirname = "/";
-}
 import { DurableObject } from 'cloudflare:workers';
 import type { SessionInfo, HubEvent, MorningBriefing, HubLocation, Geofence, EventFilters, H3Index, Landmark } from './types';
 import type { Env } from './core-utils';
-import * as h3 from 'h3-js';
 export class AppController extends DurableObject<Env> {
   private sessions = new Map<string, SessionInfo>();
   private events = new Map<string, HubEvent>();
@@ -12,6 +8,7 @@ export class AppController extends DurableObject<Env> {
   private landmarks = new Map<string, Landmark>();
   private invertedH3Index = new Map<H3Index, Set<string>>();
   private landmarkH3Index = new Map<H3Index, Set<string>>();
+  private h3Instance?: typeof import('h3-js');
   private briefing: MorningBriefing | null = null;
   private loaded = false;
   constructor(ctx: DurableObjectState, env: Env) {
@@ -150,7 +147,11 @@ export class AppController extends DurableObject<Env> {
   }
   async getGeofencesAt(lat: number, lng: number): Promise<Geofence[]> {
     await this.ensureLoaded();
-    const cell = h3.latLngToCell(lat, lng, 9);
+    if (!this.h3Instance) {
+      (globalThis as any).__dirname ??= '/';
+      this.h3Instance = await import('h3-js');
+    }
+    const cell = this.h3Instance!.latLngToCell(lat, lng, 9);
     const ids = this.invertedH3Index.get(cell);
     if (!ids) return [];
     return Array.from(ids).map(id => this.geofences.get(id)!).filter(Boolean);
