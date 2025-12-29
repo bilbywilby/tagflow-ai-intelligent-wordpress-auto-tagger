@@ -1,238 +1,162 @@
-import * as React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useAppStore } from '@/store/useAppStore';
-import { fetchEvents, fetchBriefing, syncHubPro, fetchHubStats, fetchGeofences, fetchLandmarks } from '@/lib/api';
+import { fetchEvents, fetchBriefing, triggerCuration } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import { Sparkles, MapPin, ExternalLink, RefreshCw, Search, Landmark as LandmarkIcon, TrendingUp, Clock } from 'lucide-react';
+import { Sparkles, MapPin, Calendar, ExternalLink, RefreshCw, Newspaper, Info } from 'lucide-react';
 import { toast } from 'sonner';
-import { HubLocation, Landmark } from '@/types/schema';
-import { MorningBriefing } from '@/components/MorningBriefing';
-import { formatDistanceToNow } from 'date-fns';
 export function Hub() {
   const events = useAppStore(s => s.events);
   const briefing = useAppStore(s => s.briefing);
-  const hubStats = useAppStore(s => s.hubStats);
-  const isSyncing = useAppStore(s => s.isSyncing);
-  const hubSearchQuery = useAppStore(s => s.hubSearchQuery);
-  const hubSelectedLocation = useAppStore(s => s.hubSelectedLocation);
-  const hubSelectedNeighborhood = useAppStore(s => s.hubSelectedNeighborhood);
-  const geofences = useAppStore(s => s.geofences);
+  const isCurating = useAppStore(s => s.isCurating);
   const setEvents = useAppStore(s => s.setEvents);
   const setBriefing = useAppStore(s => s.setBriefing);
-  const setSyncing = useAppStore(s => s.setSyncing);
-  const setHubStats = useAppStore(s => s.setHubStats);
-  const setHubSearchQuery = useAppStore(s => s.setHubSearchQuery);
-  const setHubSelectedLocation = useAppStore(s => s.setHubSelectedLocation);
-  const setHubSelectedNeighborhood = useAppStore(s => s.setHubSelectedNeighborhood);
-  const setGeofences = useAppStore(s => s.setGeofences);
-  const [landmarks, setLandmarks] = React.useState<Landmark[]>([]);
-  const [selectedLandmarkId, setSelectedLandmarkId] = React.useState<string | null>(null);
-  const [isBriefingLoading, setIsBriefingLoading] = React.useState(false);
-  const loadHubData = React.useCallback(async () => {
+  const setCurating = useAppStore(s => s.setCurating);
+  useEffect(() => {
+    loadHubData();
+  }, []);
+  const loadHubData = async () => {
     try {
-      const [eventsData, statsData, geoData, landmarkData] = await Promise.all([
-        fetchEvents({
-          location: hubSelectedLocation,
-          q: hubSearchQuery,
-          neighborhood: hubSelectedNeighborhood || undefined,
-          landmarkId: selectedLandmarkId || undefined
-        }),
-        fetchHubStats(),
-        fetchGeofences(),
-        fetchLandmarks()
+      const [eventsData, briefingData] = await Promise.all([
+        fetchEvents(),
+        fetchBriefing()
       ]);
       setEvents(eventsData);
-      setHubStats(statsData);
-      setGeofences(geoData);
-      setLandmarks(landmarkData);
+      setBriefing(briefingData);
     } catch (e) {
       toast.error("Failed to load Lehigh Valley intelligence");
     }
-  }, [hubSelectedLocation, hubSearchQuery, hubSelectedNeighborhood, selectedLandmarkId, setEvents, setHubStats, setGeofences, setLandmarks]);
-  const loadBriefing = React.useCallback(async () => {
-    setIsBriefingLoading(true);
-    try {
-      const briefingData = await fetchBriefing();
-      setBriefing(briefingData);
-    } catch (e) {
-      toast.error('Failed to load morning briefing');
-    } finally {
-      setIsBriefingLoading(false);
-    }
-  }, [setBriefing]);
-  React.useEffect(() => {
-    loadHubData();
-    loadBriefing();
-  }, [loadHubData, loadBriefing]);
-  const handleRefresh = async () => {
-    setSyncing(true);
-    toast.promise(syncHubPro(), {
-      loading: 'Running professional regional sync...',
+  };
+  const handleCurate = async () => {
+    setCurating(true);
+    toast.promise(triggerCuration(), {
+      loading: 'Scraping regional sources...',
       success: (data) => {
         loadHubData();
-        loadBriefing();
-        return `Sync complete: Curated ${data.count} items.`;
+        return `Successfully curated ${data.count} items`;
       },
-      error: 'Intelligence sync failed',
-      finally: () => setSyncing(false)
+      error: 'Curation failed',
+      finally: () => setCurating(false)
     });
   };
-  const getTrendingLandmarks = React.useCallback(() => {
-    const counts: Record<string, number> = {};
-    events.forEach(e => {
-      if (e.landmarkId) counts[e.landmarkId] = (counts[e.landmarkId] || 0) + 1;
-    });
-    return Object.entries(counts).filter(([_, count]) => count >= 2).map(([id]) => id);
-  }, [events]);
-  const trendingIds = React.useMemo(() => getTrendingLandmarks(), [getTrendingLandmarks]);
-  const locations: (HubLocation | 'All')[] = ['All', 'Allentown', 'Bethlehem', 'Easton', 'Greater LV'];
-  const lastSyncTime = hubStats?.lastSync ? formatDistanceToNow(new Date(hubStats.lastSync)) + ' ago' : 'Never';
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-8 md:py-10 lg:py-12">
         <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">
-              <Clock className="size-3" />
-              Intelligence Node • Last Synced {lastSyncTime}
-            </div>
             <h1 className="text-4xl font-display font-bold tracking-tight">
               Lehigh Valley <span className="text-indigo-600">Hub</span>
             </h1>
-            <p className="text-muted-foreground text-lg">Spatial Intelligence for local events and news.</p>
+            <p className="text-muted-foreground text-lg">Your AI-curated regional intelligence dashboard.</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setSelectedLandmarkId(null)} className="rounded-xl h-11">
-              Reset Focus
-            </Button>
-            <Button onClick={handleRefresh} disabled={isSyncing} className="bg-indigo-600 hover:bg-indigo-700 rounded-xl h-11 px-6">
-              <RefreshCw className={isSyncing ? "animate-spin size-4 mr-2" : "size-4 mr-2"} />
-              Pro Sync
-            </Button>
-          </div>
+          <Button 
+            onClick={handleCurate} 
+            disabled={isCurating}
+            className="bg-indigo-600 hover:bg-indigo-700 font-bold gap-2"
+          >
+            <RefreshCw className={isCurating ? "animate-spin size-4" : "size-4"} />
+            {isCurating ? "Curating..." : "Refresh Intelligence"}
+          </Button>
         </header>
-        <MorningBriefing briefing={briefing} isLoading={isBriefingLoading} />
-        <div className="space-y-6 mb-12">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search events or venues..."
-                className="pl-10 h-12 rounded-xl bg-secondary/30 border-none"
-                value={hubSearchQuery}
-                onChange={(e) => setHubSearchQuery(e.target.value)}
-              />
+        {briefing && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-12"
+          >
+            <Card className="border-none bg-slate-900 text-white shadow-2xl overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-8 opacity-10">
+                <Sparkles className="size-32" />
+              </div>
+              <CardHeader>
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="secondary" className="bg-indigo-500 text-white border-none">DAILY BRIEFING</Badge>
+                  <span className="text-xs text-slate-400 font-mono">
+                    {new Date(briefing.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                  </span>
+                </div>
+                <CardTitle className="text-3xl font-display italic">"Good Morning, Lehigh Valley..."</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg leading-relaxed text-slate-200 max-w-4xl">
+                  {briefing.content}
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+        <Tabs defaultValue="all" className="space-y-8">
+          <div className="flex items-center justify-between border-b pb-4">
+            <TabsList className="bg-secondary/50 p-1">
+              <TabsTrigger value="all">All Content</TabsTrigger>
+              <TabsTrigger value="news">Local News</TabsTrigger>
+              <TabsTrigger value="events">Events</TabsTrigger>
+            </TabsList>
+            <div className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              {events.length} Live Items
             </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 lg:pb-0 scrollbar-hide">
-              {locations.map((loc) => (
-                <Button
-                  key={loc}
-                  variant={hubSelectedLocation === (loc === 'All' ? null : loc) ? 'default' : 'secondary'}
-                  size="sm"
-                  onClick={() => setHubSelectedLocation(loc === 'All' ? null : loc)}
-                  className="rounded-full px-4 h-10 shrink-0 font-bold text-xs"
-                >
-                  {loc}
-                </Button>
+          </div>
+          <TabsContent value="all" className="mt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {events.map((event) => (
+                <motion.div key={event.id} layout>
+                  <Card className="h-full flex flex-col group hover:shadow-lg transition-all border-indigo-50/50 dark:border-indigo-950/50">
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <Badge variant="outline" className="text-[10px] font-bold border-indigo-100 text-indigo-600 uppercase">
+                          {event.category}
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground font-mono">
+                          {new Date(event.eventDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <CardTitle className="text-lg font-bold group-hover:text-indigo-600 transition-colors">
+                        {event.title}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-1 space-y-4">
+                      <p className="text-sm text-muted-foreground line-clamp-3 italic">
+                        {event.summary}
+                      </p>
+                      <div className="space-y-2 pt-4 border-t border-dashed">
+                        <div className="flex items-center gap-2 text-xs font-medium text-foreground/80">
+                          <MapPin className="size-3.5 text-indigo-500" />
+                          {event.venue} • {event.location}
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="pt-4 flex justify-end">
+                      <Button variant="ghost" size="sm" asChild className="gap-2 text-xs font-bold">
+                        <a href={event.sourceUrl} target="_blank" rel="noopener noreferrer">
+                          Source <ExternalLink className="size-3" />
+                        </a>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </motion.div>
               ))}
             </div>
-          </div>
-        </div>
-        <Tabs defaultValue="feed" className="space-y-8">
-          <TabsList className="bg-secondary/50 p-1 rounded-xl h-12 w-fit">
-            <TabsTrigger value="feed" className="rounded-lg h-10 px-6 data-[state=active]:bg-background">Intelligence Feed</TabsTrigger>
-            <TabsTrigger value="districts" className="rounded-lg h-10 px-6 data-[state=active]:bg-background">Neighborhoods</TabsTrigger>
-          </TabsList>
-          <TabsContent value="feed" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <AnimatePresence mode="popLayout">
-              {events.length > 0 ? (
-                events.map((event) => {
-                  const landmark = landmarks.find(l => l.id === event.landmarkId);
-                  const isTrending = event.landmarkId && trendingIds.includes(event.landmarkId);
-                  return (
-                    <motion.div 
-                      key={event.id} 
-                      layout 
-                      initial={{ opacity: 0, scale: 0.95 }} 
-                      animate={{ opacity: 1, scale: 1 }} 
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <Card className="h-full flex flex-col group border-none shadow-soft hover:shadow-glow transition-all duration-300">
-                        <CardHeader className="pb-3">
-                          <div className="flex justify-between items-start mb-2">
-                            <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                              {event.category}
-                            </Badge>
-                            {isTrending && (
-                              <Badge className="bg-orange-500 text-white border-0 text-[10px] animate-pulse">
-                                <TrendingUp className="size-3 mr-1" /> TRENDING VENUE
-                              </Badge>
-                            )}
-                          </div>
-                          <CardTitle className="text-xl font-bold leading-tight group-hover:text-indigo-600 transition-colors">
-                            {event.title}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex-1">
-                          <p className="text-sm text-muted-foreground line-clamp-3 mb-6 leading-relaxed">{event.summary}</p>
-                          <div className="space-y-2 pt-4 border-t border-dashed">
-                            <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-                              <MapPin className="size-3.5 text-indigo-500" />
-                              <span>{event.venue}</span>
-                            </div>
-                            {landmark && (
-                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground pl-5 uppercase font-bold tracking-widest">
-                                <LandmarkIcon className="size-3" />
-                                <span>{landmark.category} Landmark</span>
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                        <div className="p-6 pt-0">
-                          <Button variant="outline" className="w-full rounded-xl h-10 font-bold border-secondary hover:bg-indigo-50 hover:text-indigo-600 transition-colors" asChild>
-                            <a href={event.sourceUrl} target="_blank" rel="noopener noreferrer">
-                              View Details <ExternalLink className="size-3.5 ml-2" />
-                            </a>
-                          </Button>
-                        </div>
-                      </Card>
-                    </motion.div>
-                  );
-                })
-              ) : (
-                <div className="col-span-full py-24 text-center">
-                  <p className="text-muted-foreground">No events found for the current selection.</p>
-                </div>
-              )}
-            </AnimatePresence>
-          </TabsContent>
-          <TabsContent value="districts" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {geofences.map(fence => (
-              <Card 
-                key={fence.id} 
-                className="cursor-pointer border-none shadow-soft hover:shadow-glow hover:translate-y-[-2px] transition-all duration-300" 
-                onClick={() => {
-                  setHubSelectedLocation(fence.canonicalPlace);
-                  setHubSelectedNeighborhood(fence.name);
-                }}
-              >
-                <CardHeader>
-                  <CardTitle className="text-lg font-bold">{fence.name}</CardTitle>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest flex items-center gap-1.5 mt-1">
-                    <MapPin className="size-3" />
-                    {fence.canonicalPlace} • {fence.zipCodes.join(', ')}
-                  </p>
-                </CardHeader>
-              </Card>
-            ))}
           </TabsContent>
         </Tabs>
+        <footer className="mt-24 border-t py-12 text-center">
+          <div className="flex flex-col items-center gap-4">
+             <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">
+               <Info className="size-4" />
+               Automated Regional Intelligence
+             </div>
+             <p className="text-sm text-muted-foreground max-w-xl">
+               The Lehigh Valley Hub uses Gemini-2.0 to scrape and summarize regional news from WFMZ and LehighValleyNews. Sources are updated every 24 hours.
+             </p>
+          </div>
+        </footer>
       </div>
     </div>
   );
+}
+function CardFooter({ children, className }: { children: React.ReactNode, className?: string }) {
+  return <div className={`p-6 pt-0 ${className}`}>{children}</div>;
 }

@@ -1,28 +1,31 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { SessionInfo } from './types';
+import type { SessionInfo, HubEvent, MorningBriefing } from './types';
 import type { Env } from './core-utils';
-
-// 🤖 AI Extension Point: Add session management features
 export class AppController extends DurableObject<Env> {
   private sessions = new Map<string, SessionInfo>();
+  private events = new Map<string, HubEvent>();
+  private briefing: MorningBriefing | null = null;
   private loaded = false;
-
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
   }
-
   private async ensureLoaded(): Promise<void> {
     if (!this.loaded) {
-      const stored = await this.ctx.storage.get<Record<string, SessionInfo>>('sessions') || {};
-      this.sessions = new Map(Object.entries(stored));
+      const storedSessions = await this.ctx.storage.get<Record<string, SessionInfo>>('sessions') || {};
+      const storedEvents = await this.ctx.storage.get<Record<string, HubEvent>>('hub_events') || {};
+      const storedBriefing = await this.ctx.storage.get<MorningBriefing>('morning_briefing') || null;
+      this.sessions = new Map(Object.entries(storedSessions));
+      this.events = new Map(Object.entries(storedEvents));
+      this.briefing = storedBriefing;
       this.loaded = true;
     }
   }
-
-  private async persist(): Promise<void> {
+  private async persistSessions(): Promise<void> {
     await this.ctx.storage.put('sessions', Object.fromEntries(this.sessions));
   }
-
+  private async persistEvents(): Promise<void> {
+    await this.ctx.storage.put('hub_events', Object.fromEntries(this.events));
+  }
   async addSession(sessionId: string, title?: string): Promise<void> {
     await this.ensureLoaded();
     const now = Date.now();
@@ -32,56 +35,47 @@ export class AppController extends DurableObject<Env> {
       createdAt: now,
       lastActive: now
     });
-    await this.persist();
+    await this.persistSessions();
   }
-
   async removeSession(sessionId: string): Promise<boolean> {
     await this.ensureLoaded();
     const deleted = this.sessions.delete(sessionId);
-    if (deleted) await this.persist();
+    if (deleted) await this.persistSessions();
     return deleted;
   }
-
   async updateSessionActivity(sessionId: string): Promise<void> {
     await this.ensureLoaded();
     const session = this.sessions.get(sessionId);
     if (session) {
       session.lastActive = Date.now();
-      await this.persist();
+      await this.persistSessions();
     }
   }
-
-  async updateSessionTitle(sessionId: string, title: string): Promise<boolean> {
-    await this.ensureLoaded();
-    const session = this.sessions.get(sessionId);
-    if (session) {
-      session.title = title;
-      await this.persist();
-      return true;
-    }
-    return false;
-  }
-
   async listSessions(): Promise<SessionInfo[]> {
     await this.ensureLoaded();
     return Array.from(this.sessions.values()).sort((a, b) => b.lastActive - a.lastActive);
   }
-
-  async getSessionCount(): Promise<number> {
+  // --- Hub Event Persistence (D1 Simulation) ---
+  async upsertEvent(event: HubEvent): Promise<void> {
     await this.ensureLoaded();
-    return this.sessions.size;
+    // Deduplication by normalized title and date
+    const dedupKey = `${event.title.toLowerCase().trim()}_${event.eventDate}`;
+    this.events.set(dedupKey, { ...event, id: event.id || crypto.randomUUID() });
+    await this.persistEvents();
   }
-
-  async getSession(sessionId: string): Promise<SessionInfo | null> {
+  async listEvents(): Promise<HubEvent[]> {
     await this.ensureLoaded();
-    return this.sessions.get(sessionId) || null;
+    return Array.from(this.events.values()).sort((a, b) => 
+      new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime()
+    );
   }
-
-  async clearAllSessions(): Promise<number> {
+  async saveMorningBriefing(briefing: MorningBriefing): Promise<void> {
     await this.ensureLoaded();
-    const count = this.sessions.size;
-    this.sessions.clear();
-    await this.persist();
-    return count;
+    this.briefing = briefing;
+    await this.ctx.storage.put('morning_briefing', briefing);
+  }
+  async getMorningBriefing(): Promise<MorningBriefing | null> {
+    await this.ensureLoaded();
+    return this.briefing;
   }
 }
