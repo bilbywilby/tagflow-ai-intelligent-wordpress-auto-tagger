@@ -1,33 +1,27 @@
-import React, { useState } from 'react';
-import { useShallow } from 'zustand/react/shallow';
+import React from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { StudioLayout } from '@/components/layout/StudioLayout';
-import { FeedSelector } from '@/components/FeedSelector';
+import { FeedInput } from '@/components/FeedInput';
 import { ArticleCard } from '@/components/ArticleCard';
-import { BatchActions } from '@/components/BatchActions';
 import { fetchFeed, analyzeArticle, syncToWP } from '@/lib/api';
 import { toast } from 'sonner';
 import { TagflowLogo } from '@/components/TagflowLogo';
-import { Info, Trash2, ShieldAlert } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Info } from 'lucide-react';
 export default function TaggingStudio() {
-  // 1. Primitive and Shallow Selectors
-  const articles = useAppStore(useShallow((s) => s.articles));
+  const articles = useAppStore((s) => s.articles);
   const isLoading = useAppStore((s) => s.isLoading);
-  const clearArticles = useAppStore((s) => s.clearArticles);
+  const setArticles = useAppStore((s) => s.setArticles);
   const addArticles = useAppStore((s) => s.addArticles);
   const updateArticle = useAppStore((s) => s.updateArticle);
   const setLoading = useAppStore((s) => s.setLoading);
-  // 2. Local State
-  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const handleFetchFeed = async (url: string) => {
     setLoading(true);
     try {
       const fetched = await fetchFeed(url);
       addArticles(fetched);
-      toast.success(`Successfully loaded ${fetched.length} new articles`);
+      toast.success(`Fetched ${fetched.length} articles from feed`);
     } catch (e) {
-      toast.error('Failed to fetch RSS feed. The URL may be invalid or restricted.');
+      toast.error('Failed to fetch RSS feed. Please check the URL.');
     } finally {
       setLoading(false);
     }
@@ -39,9 +33,10 @@ export default function TaggingStudio() {
     try {
       const tags = await analyzeArticle(article);
       updateArticle(id, { tags, status: 'tagged' });
+      toast.success('AI tags generated');
     } catch (e) {
       updateArticle(id, { status: 'error' });
-      throw e;
+      toast.error('AI Analysis failed');
     }
   };
   const handleSync = async (id: string) => {
@@ -51,42 +46,11 @@ export default function TaggingStudio() {
     try {
       await syncToWP(id, article.tags);
       updateArticle(id, { status: 'synced' });
+      toast.success('Synced to WordPress');
     } catch (e) {
       updateArticle(id, { status: 'error' });
-      throw e;
+      toast.error('Sync failed');
     }
-  };
-  const handleAnalyzeAll = async () => {
-    const pending = articles.filter(a => a.status === 'pending');
-    if (pending.length === 0) return;
-    setIsBatchProcessing(true);
-    let successCount = 0;
-    for (const article of pending) {
-      try {
-        await handleAnalyze(article.id);
-        successCount++;
-      } catch (err) {
-        console.error(`Failed to analyze ${article.id}`, err);
-      }
-    }
-    setIsBatchProcessing(false);
-    toast.success(`Batch complete: ${successCount} articles analyzed.`);
-  };
-  const handleSyncAll = async () => {
-    const tagged = articles.filter(a => a.status === 'tagged');
-    if (tagged.length === 0) return;
-    setIsBatchProcessing(true);
-    let successCount = 0;
-    for (const article of tagged) {
-      try {
-        await handleSync(article.id);
-        successCount++;
-      } catch (err) {
-        console.error(`Failed to sync ${article.id}`, err);
-      }
-    }
-    setIsBatchProcessing(false);
-    toast.success(`Batch complete: ${successCount} articles synced to WP.`);
   };
   const handleRemoveTag = (articleId: string, tagId: string) => {
     const article = articles.find(a => a.id === articleId);
@@ -95,69 +59,48 @@ export default function TaggingStudio() {
     updateArticle(articleId, { tags: newTags });
   };
   return (
-    <StudioLayout
+    <StudioLayout 
       header={
-        <div className="flex flex-col md:flex-row items-center gap-6 w-full">
-          <TagflowLogo />
-          <div className="flex-1 flex justify-center w-full">
-            <FeedSelector onSelect={handleFetchFeed} isLoading={isLoading} />
+        <>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-lg">
+              <span className="font-bold text-xl">TF</span>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">TagFlow Studio</h1>
+              <p className="text-sm text-muted-foreground">Automated WordPress Taxonomy Intelligence</p>
+            </div>
           </div>
-          {articles.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearArticles} className="text-muted-foreground hover:text-destructive">
-              <Trash2 className="h-4 w-4 mr-2" />
-              Clear
-            </Button>
-          )}
-        </div>
+          <FeedInput onFetch={handleFetchFeed} isLoading={isLoading} />
+        </>
       }
     >
-      {articles.length > 0 && (
-        <div className="mb-10">
-          <BatchActions
-            articles={articles}
-            onAnalyzeAll={handleAnalyzeAll}
-            onSyncAll={handleSyncAll}
-            isProcessing={isBatchProcessing}
-          />
-        </div>
-      )}
       {articles.length === 0 ? (
-        <div className="min-h-[500px] flex flex-col items-center justify-center text-center border-2 border-dashed rounded-4xl p-12 bg-muted/20 border-muted-foreground/10">
-          <div className="w-20 h-20 rounded-3xl bg-indigo-500/10 flex items-center justify-center mb-8">
-            <Info className="w-10 h-10 text-indigo-500" />
+        <div className="min-h-[400px] flex flex-col items-center justify-center text-center border-2 border-dashed rounded-3xl p-12 bg-muted/30">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+            <Info className="w-8 h-8 text-primary" />
           </div>
-          <h2 className="text-2xl font-bold mb-3">Your Tagging Studio is Empty</h2>
-          <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-            Use the directory above to select a Lehigh Valley news feed, or enter a custom WordPress RSS URL to begin your automated tagging workflow.
+          <h2 className="text-xl font-semibold mb-2">No Articles Loaded</h2>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            Enter a WordPress RSS feed URL above to begin. We'll fetch your latest posts and help you generate intelligent tags.
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {articles.map((article) => (
-            <ArticleCard
+            <ArticleCard 
               key={article.id}
               article={article}
-              onAnalyze={() => handleAnalyze(article.id)}
-              onSync={() => handleSync(article.id)}
+              onAnalyze={handleAnalyze}
+              onSync={handleSync}
               onRemoveTag={handleRemoveTag}
             />
           ))}
         </div>
       )}
-      <footer className="mt-24 border-t py-12">
-        <div className="max-w-2xl mx-auto flex flex-col items-center gap-6 text-center">
-          <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 rounded-full text-xs font-medium border border-amber-200 dark:border-amber-900">
-            <ShieldAlert className="h-4 w-4" />
-            <span>AI RATE LIMIT WARNING</span>
-          </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Please be advised that while TagFlow AI provides advanced content classification capabilities, there is a limit on the number of requests that can be made to the AI servers across all user apps in a given time period.
-          </p>
-          <div className="flex flex-col gap-1">
-            <p className="text-xs font-bold text-foreground/50 uppercase tracking-widest">Powered by</p>
-            <p className="text-sm font-semibold">Cloudflare Agents & OpenAI Infrastructure</p>
-          </div>
-        </div>
+      <footer className="mt-20 border-t pt-8 text-center text-sm text-muted-foreground">
+        <p>Although this project has AI capabilities, there is a limit on the number of requests that can be made to the AI servers across all user apps in a given time period.</p>
+        <p className="mt-2">Powered by Cloudflare Agents & OpenAI</p>
       </footer>
     </StudioLayout>
   );

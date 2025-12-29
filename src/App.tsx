@@ -1,12 +1,12 @@
-import React from 'react';
-import { Outlet } from 'react-router-dom';
-import { AppLayout } from '@/components/layout/AppLayout';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Toaster } from '@/components/ui/sonner';
+import TaggingStudio from '@/pages/TaggingStudio';
 export default function App() {
   return (
-    <AppLayout container contentClassName="relative min-h-screen">
-      <Outlet />
+    <div className="min-h-screen bg-background">
+      <ThemeToggle />
+      <TaggingStudio />
       <Toaster richColors closeButton position="top-right" />
-    </AppLayout>
+    </div>
   );
 }
