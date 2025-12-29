@@ -1,8 +1,9 @@
-import React from 'react';
+import { useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { StudioLayout } from '@/components/layout/StudioLayout';
 import { FeedSelector } from '@/components/FeedSelector';
 import { ArticleCard } from '@/components/ArticleCard';
+import { BatchActions } from '@/components/BatchActions';
 import { fetchFeed, analyzeArticle, syncToWP } from '@/lib/api';
 import { toast } from 'sonner';
 import { TagflowLogo } from '@/components/TagflowLogo';
@@ -11,10 +12,11 @@ import { Button } from '@/components/ui/button';
 export default function TaggingStudio() {
   const articles = useAppStore((s) => s.articles);
   const isLoading = useAppStore((s) => s.isLoading);
-  const setArticles = useAppStore((s) => s.setArticles);
+  const clearArticles = useAppStore((s) => s.clearArticles);
   const addArticles = useAppStore((s) => s.addArticles);
   const updateArticle = useAppStore((s) => s.updateArticle);
   const setLoading = useAppStore((s) => s.setLoading);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const handleFetchFeed = async (url: string) => {
     setLoading(true);
     try {
@@ -34,10 +36,9 @@ export default function TaggingStudio() {
     try {
       const tags = await analyzeArticle(article);
       updateArticle(id, { tags, status: 'tagged' });
-      toast.success('Generated AI suggestions');
     } catch (e) {
       updateArticle(id, { status: 'error' });
-      toast.error('AI Processing failed');
+      throw e;
     }
   };
   const handleSync = async (id: string) => {
@@ -47,11 +48,42 @@ export default function TaggingStudio() {
     try {
       await syncToWP(id, article.tags);
       updateArticle(id, { status: 'synced' });
-      toast.success('Synchronized with WordPress instance');
     } catch (e) {
       updateArticle(id, { status: 'error' });
-      toast.error('WordPress Sync failed');
+      throw e;
     }
+  };
+  const handleAnalyzeAll = async () => {
+    const pending = articles.filter(a => a.status === 'pending');
+    if (pending.length === 0) return;
+    setIsBatchProcessing(true);
+    let successCount = 0;
+    for (const article of pending) {
+      try {
+        await handleAnalyze(article.id);
+        successCount++;
+      } catch (err) {
+        console.error(`Failed to analyze ${article.id}`, err);
+      }
+    }
+    setIsBatchProcessing(false);
+    toast.success(`Batch complete: ${successCount} articles analyzed.`);
+  };
+  const handleSyncAll = async () => {
+    const tagged = articles.filter(a => a.status === 'tagged');
+    if (tagged.length === 0) return;
+    setIsBatchProcessing(true);
+    let successCount = 0;
+    for (const article of tagged) {
+      try {
+        await handleSync(article.id);
+        successCount++;
+      } catch (err) {
+        console.error(`Failed to sync ${article.id}`, err);
+      }
+    }
+    setIsBatchProcessing(false);
+    toast.success(`Batch complete: ${successCount} articles synced to WP.`);
   };
   const handleRemoveTag = (articleId: string, tagId: string) => {
     const article = articles.find(a => a.id === articleId);
@@ -59,27 +91,33 @@ export default function TaggingStudio() {
     const newTags = article.tags.filter(t => t.id !== tagId);
     updateArticle(articleId, { tags: newTags });
   };
-  const handleClearAll = () => {
-    setArticles([]);
-    toast.info('Workspace cleared');
-  };
   return (
     <StudioLayout
       header={
-        <>
+        <div className="flex flex-col md:flex-row items-center gap-6 w-full">
           <TagflowLogo />
-          <div className="flex-1 flex justify-center w-full md:w-auto">
+          <div className="flex-1 flex justify-center w-full">
             <FeedSelector onSelect={handleFetchFeed} isLoading={isLoading} />
           </div>
           {articles.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={handleClearAll} className="text-muted-foreground hover:text-destructive">
+            <Button variant="ghost" size="sm" onClick={clearArticles} className="text-muted-foreground hover:text-destructive">
               <Trash2 className="h-4 w-4 mr-2" />
               Clear
             </Button>
           )}
-        </>
+        </div>
       }
     >
+      {articles.length > 0 && (
+        <div className="mb-10">
+          <BatchActions 
+            articles={articles} 
+            onAnalyzeAll={handleAnalyzeAll} 
+            onSyncAll={handleSyncAll}
+            isProcessing={isBatchProcessing}
+          />
+        </div>
+      )}
       {articles.length === 0 ? (
         <div className="min-h-[500px] flex flex-col items-center justify-center text-center border-2 border-dashed rounded-4xl p-12 bg-muted/20 border-muted-foreground/10">
           <div className="w-20 h-20 rounded-3xl bg-indigo-500/10 flex items-center justify-center mb-8">
@@ -96,8 +134,8 @@ export default function TaggingStudio() {
             <ArticleCard
               key={article.id}
               article={article}
-              onAnalyze={handleAnalyze}
-              onSync={handleSync}
+              onAnalyze={() => handleAnalyze(article.id)}
+              onSync={() => handleSync(article.id)}
               onRemoveTag={handleRemoveTag}
             />
           ))}
@@ -110,8 +148,7 @@ export default function TaggingStudio() {
             <span>AI RATE LIMIT WARNING</span>
           </div>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Please be advised that while TagFlow AI provides advanced content classification capabilities, there is a hard limit on the number of requests that can be processed by the AI models across all active sessions. 
-            Large-scale batch operations may experience throttling.
+            Please be advised that while TagFlow AI provides advanced content classification capabilities, there is a hard limit on the number of requests that can be processed by the AI models across all active sessions.
           </p>
           <div className="flex flex-col gap-1">
             <p className="text-xs font-bold text-foreground/50 uppercase tracking-widest">Powered by</p>

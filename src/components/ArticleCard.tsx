@@ -1,9 +1,9 @@
-import React from 'react';
+import { forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Sparkles, Check, Send, X, AlertCircle, Copy, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Send, X, AlertCircle, Copy, CheckCircle2 } from 'lucide-react';
 import { Article, Tag } from '@/types/schema';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -13,7 +13,7 @@ interface ArticleCardProps {
   onSync: (id: string) => void;
   onRemoveTag: (articleId: string, tagId: string) => void;
 }
-export function ArticleCard({ article, onAnalyze, onSync, onRemoveTag }: ArticleCardProps) {
+export const ArticleCard = forwardRef<HTMLDivElement, ArticleCardProps>(({ article, onAnalyze, onSync, onRemoveTag }, ref) => {
   const isAnalyzing = article.status === 'analyzing';
   const isTagged = article.status === 'tagged';
   const isSyncing = article.status === 'syncing';
@@ -25,6 +25,7 @@ export function ArticleCard({ article, onAnalyze, onSync, onRemoveTag }: Article
   };
   return (
     <motion.div
+      ref={ref}
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -36,12 +37,17 @@ export function ArticleCard({ article, onAnalyze, onSync, onRemoveTag }: Article
         isAnalyzing && "border-indigo-500/50 shadow-glow",
         isSynced && "bg-emerald-50/20 dark:bg-emerald-950/5 border-emerald-500/30 shadow-none"
       )}>
-        <CardHeader className="pb-3 relative">
+        <CardHeader className="pb-3 relative group">
           <div className="flex justify-between items-start gap-4">
             <CardTitle className="text-lg font-bold leading-tight line-clamp-2 group-hover:text-indigo-600 transition-colors">
               {article.title}
             </CardTitle>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={copyToClipboard}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" 
+              onClick={copyToClipboard}
+            >
               <Copy className="h-4 w-4" />
             </Button>
           </div>
@@ -88,17 +94,17 @@ export function ArticleCard({ article, onAnalyze, onSync, onRemoveTag }: Article
                 </div>
               )}
             </div>
-            {isTagged && article.tags.length > 0 && (
+            {(isTagged || isSynced) && article.tags.length > 0 && (
               <div className="pt-2">
                  <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase mb-1">
                    <span>AI Confidence</span>
                    <span>92%</span>
                  </div>
                  <div className="h-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                   <motion.div 
-                     initial={{ width: 0 }} 
-                     animate={{ width: '92%' }} 
-                     className="h-full bg-indigo-500" 
+                   <motion.div
+                     initial={{ width: 0 }}
+                     animate={{ width: '92%' }}
+                     className="h-full bg-indigo-500"
                    />
                  </div>
               </div>
@@ -125,12 +131,8 @@ export function ArticleCard({ article, onAnalyze, onSync, onRemoveTag }: Article
                 disabled={isAnalyzing || isSyncing}
                 className="gap-2 h-9 text-xs font-bold border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 dark:border-indigo-900 dark:hover:bg-indigo-950"
               >
-                {isAnalyzing ? (
-                  <Sparkles className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-                )}
-                Analyze
+                <Sparkles className={cn("h-3.5 w-3.5", isAnalyzing ? "animate-spin" : "text-indigo-500")} />
+                {isAnalyzing ? 'Thinking...' : 'Analyze'}
               </Button>
             )}
             {(isTagged || isSynced) && (
@@ -152,7 +154,7 @@ export function ArticleCard({ article, onAnalyze, onSync, onRemoveTag }: Article
                 ) : (
                   <Send className="h-3.5 w-3.5" />
                 )}
-                {isSynced ? 'Success' : 'Push to WP'}
+                {isSyncing ? 'Syncing...' : isSynced ? 'Success' : 'Push to WP'}
               </Button>
             )}
           </div>
@@ -160,4 +162,5 @@ export function ArticleCard({ article, onAnalyze, onSync, onRemoveTag }: Article
       </Card>
     </motion.div>
   );
-}
+});
+ArticleCard.displayName = "ArticleCard";
