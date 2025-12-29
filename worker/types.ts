@@ -1,3 +1,4 @@
+export type H3Index = string;
 export interface ApiResponse<T = unknown> { success: boolean; data?: T; error?: string; }
 export interface WeatherResult {
   location: string;
@@ -19,6 +20,10 @@ export interface Geofence {
   canonicalPlace: HubLocation;
   aliases: string[];
   zipCodes: string[];
+  // H3 Extensions
+  h3Indexes?: H3Index[];
+  centroid?: { lat: number; lng: number };
+  bbox?: [number, number, number, number]; // [minLng, minLat, maxLng, maxLat]
 }
 export interface HubEvent {
   id: string;
@@ -26,6 +31,8 @@ export interface HubEvent {
   venue: string;
   location: HubLocation;
   neighborhood?: string;
+  neighborhoodId?: string; // H3 Relational ID
+  h3Index?: H3Index;       // Precision cell
   zipCode?: string;
   eventDate: string;
   category: HubCategory;
@@ -69,5 +76,9 @@ export interface EventFilters {
   category?: HubCategory;
   location?: HubLocation;
   neighborhood?: string;
+  neighborhoodId?: string;
   searchQuery?: string;
+  lat?: number;
+  lng?: number;
+  radius?: number; // In H3 cells or KM
 }
