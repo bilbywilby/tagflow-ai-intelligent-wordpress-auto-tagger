@@ -17,7 +17,7 @@ export type HubLocation = 'Allentown' | 'Bethlehem' | 'Easton' | 'Greater LV' | 
 export interface Landmark {
   id: string;
   name: string;
-  category: 'Sports' | 'Entertainment' | 'Education' | 'Culture' | 'Public';
+  category: 'Sports' | 'Entertainment' | 'Education' | 'Culture' | 'Public' | 'Arts' | 'Government' | 'Retail';
   address: string;
   lat: number;
   lng: number;

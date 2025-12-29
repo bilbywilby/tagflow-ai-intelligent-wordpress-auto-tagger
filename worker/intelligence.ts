@@ -3,8 +3,7 @@ import Parser from "rss-parser";
 import type { Env } from "./core-utils";
 import type { HubEvent, HubLocation, HubCategory, Landmark } from "./types";
 import { resolveNeighborhood, extractZipCode } from "./geofences";
-import { latLngToH3, resolveZipToCoords } from "./geofences-h3";
-import { resolveVenueToLandmark } from "./gazetteer";
+import { resolveVenueToLandmark, landmarkToNeighborhood } from "./gazetteer";
 const parser = new Parser({
   customFields: {
     item: [['media:content', 'mediaContent'], ['content:encoded', 'contentEncoded']]
@@ -25,14 +24,9 @@ export async function normalizeContent(openai: OpenAI, title: string, content: s
   h3Index?: string;
   landmarkId?: string;
 }> {
-  const prompt = `Act as a Lehigh Valley Regional Analyst.
-  Extract structured metadata.
-  Rules:
-  1. Summary MUST be 2 professional sentences.
-  2. Location MUST be: Allentown, Bethlehem, Easton, Greater LV.
-  3. Category: Family, Nightlife, Arts, News, General.
-  Input: ${title} - ${content.slice(0, 500)}
-  Return JSON: { "summary": "string", "venue": "string", "location": "string", "neighborhood": "string", "category": "string" }`;
+  const prompt = `Extract regional metadata from this Lehigh Valley article.
+  Return JSON: { "summary": "2 professional sentences", "venue": "specific landmark or venue name", "location": "Allentown/Bethlehem/Easton/Greater LV", "neighborhood": "specific district", "category": "Family/Nightlife/Arts/News/General" }
+  Input: ${title} - ${content.slice(0, 800)}`;
   try {
     const completion = await openai.chat.completions.create({
       model: "google-ai-studio/gemini-2.0-flash",
@@ -41,24 +35,16 @@ export async function normalizeContent(openai: OpenAI, title: string, content: s
     });
     const data = JSON.parse(completion.choices[0].message.content || "{}");
     const zipCode = extractZipCode(`${content} ${title}`);
-    // Spatial Resolution via Gazetteer
     const landmark = resolveVenueToLandmark(data.venue || title, landmarks);
-    let h3Index = landmark?.h3Index;
-    let landmarkId = landmark?.id;
-    // Fallback to Zip if no landmark
-    if (!h3Index && zipCode) {
-      const coords = resolveZipToCoords(zipCode);
-      if (coords) h3Index = latLngToH3(coords[0], coords[1], 9);
-    }
     return {
       summary: data.summary || title,
-      venue: data.venue || "Lehigh Valley",
+      venue: landmark?.name || data.venue || "Lehigh Valley",
       location: (data.location || "Greater LV") as HubLocation,
       neighborhood: data.neighborhood,
       category: (data.category as HubCategory) || "News",
       zipCode,
-      h3Index,
-      landmarkId
+      h3Index: landmark?.h3Index,
+      landmarkId: landmark?.id
     };
   } catch (e) {
     return { summary: title, venue: "Lehigh Valley", location: "Greater LV", category: "News" };
@@ -74,19 +60,28 @@ export async function runProSync(env: Env, controller: any) {
       const res = await fetch(source.url);
       if (!res.ok) continue;
       const feed = await parser.parseString(await res.text());
-      for (const item of feed.items.slice(0, 5)) {
+      for (const item of feed.items.slice(0, 10)) {
         const normalized = await normalizeContent(openai, item.title || "", item.contentSnippet || "", landmarks);
+        let neighborhood = normalized.neighborhood;
         let neighborhoodId;
-        if (normalized.neighborhood) {
-          const matched = geofences.find((f: any) => f.name.toLowerCase() === normalized.neighborhood?.toLowerCase());
+        // Enrichment: Landmark -> Neighborhood
+        const landmark = landmarks.find((l: any) => l.id === normalized.landmarkId);
+        if (landmark && !neighborhood) {
+          const enrichedFence = landmarkToNeighborhood(landmark, geofences);
+          if (enrichedFence) {
+            neighborhood = enrichedFence.name;
+            neighborhoodId = enrichedFence.id;
+          }
+        } else if (neighborhood) {
+          const matched = geofences.find((f: any) => f.name.toLowerCase() === neighborhood?.toLowerCase());
           if (matched) neighborhoodId = matched.id;
         }
         const event: HubEvent = {
           id: crypto.randomUUID(),
-          title: item.title || "Update",
+          title: item.title || "Regional Update",
           venue: normalized.venue,
           location: normalized.location,
-          neighborhood: normalized.neighborhood,
+          neighborhood,
           neighborhoodId,
           landmarkId: normalized.landmarkId,
           h3Index: normalized.h3Index,
@@ -98,9 +93,11 @@ export async function runProSync(env: Env, controller: any) {
         };
         await controller.upsertEvent(event);
         totalIngested++;
+        // Rate limiting cooldown
+        await new Promise(r => setTimeout(r, 200));
       }
     } catch (err) {
-      console.error("Sync Error for source:", source.name, err);
+      console.error("Pro Sync failed for source:", source.name, err);
     }
   }
   return totalIngested;
