@@ -80,7 +80,8 @@ function runSetupCommands() {
     const commands = [
     "bun add rss-parser@^3.13.0",
     "bun add cheerio@^1.0.0-rc.12",
-    "bun add lucide-react clsx tailwind-merge"
+    "bun add lucide-react clsx tailwind-merge",
+    "bun add rss-parser uuid"
 ];
     
     if (commands.length === 0) {
