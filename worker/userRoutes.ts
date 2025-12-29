@@ -42,7 +42,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   });
   app.get('/api/hub/briefing', async (c) => {
     const controller = getAppController(c.env);
-    let briefing = await controller.getMorningBriefing();
+    let briefing: any = await controller.getMorningBriefing();
     // Auto-generate if missing or older than 12 hours
     const isStale = briefing && (Date.now() - new Date(briefing.date).getTime() > 12 * 60 * 60 * 1000);
     if (!briefing || isStale) {
@@ -75,15 +75,15 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         await controller.upsertGeofence(fence);
       }
       const newStats = await controller.getSyncStats();
-      return c.json({ 
-        success: true, 
-        data: { ...newStats, briefingStatus: briefing?.date || null }, 
-        seeded: true 
+      return c.json({
+        success: true,
+        data: { ...newStats, briefingStatus: briefing?.date || null },
+        seeded: true
       });
     }
-    return c.json({ 
-      success: true, 
-      data: { ...stats, briefingStatus: briefing?.date || null } 
+    return c.json({
+      success: true,
+      data: { ...stats, briefingStatus: briefing?.date || null }
     });
   });
 }

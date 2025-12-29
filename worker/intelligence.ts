@@ -52,12 +52,12 @@ export async function normalizeContent(openai: OpenAI, title: string, content: s
 }
 export async function generateMorningBriefing(env: Env, controller: any): Promise<MorningBriefing> {
   const openai = new OpenAI({ baseURL: env.CF_AI_BASE_URL, apiKey: env.CF_AI_API_KEY });
-  const events = await controller.listEvents();
+  const events = (await controller.listEvents()) as HubEvent[];
   // Filter events from last 48 hours
   const cutoff = Date.now() - (48 * 60 * 60 * 1000);
-  const recentEvents = events.filter(e => new Date(e.createdAt).getTime() > cutoff);
-  const eventList = recentEvents.slice(0, 15).map(e => `- ${e.title} at ${e.venue} (${e.location})`).join('\n');
-  const prompt = `You are the Lehigh Valley Intelligence Director. Synthesize the following regional events into a concise, professional 3-sentence "Morning Briefing". 
+  const recentEvents = events.filter((e: HubEvent) => new Date(e.createdAt).getTime() > cutoff);
+  const eventList = recentEvents.slice(0, 15).map((e: HubEvent) => `- ${e.title} at ${e.venue} (${e.location})`).join('\n');
+  const prompt = `You are the Lehigh Valley Intelligence Director. Synthesize the following regional events into a concise, professional 3-sentence "Morning Briefing".
   Focus on identifying trends (e.g. "Bethlehem is seeing a surge in arts events") and highlighting major landmarks.
   Events:
   ${eventList}
@@ -69,7 +69,7 @@ export async function generateMorningBriefing(env: Env, controller: any): Promis
       response_format: { type: "json_object" }
     });
     const data = JSON.parse(completion.choices[0].message.content || "{}");
-    const uniqueLandmarks = new Set(recentEvents.map(e => e.landmarkId).filter(Boolean));
+    const uniqueLandmarks = new Set(recentEvents.map((e: HubEvent) => e.landmarkId).filter(Boolean));
     const briefing: MorningBriefing = {
       id: crypto.randomUUID(),
       date: new Date().toISOString(),
