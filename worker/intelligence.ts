@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import Parser from "rss-parser";
 import type { Env } from "./core-utils";
-import type { HubEvent, HubLocation, HubCategory, Landmark } from "./types";
+import type { HubEvent, HubLocation, HubCategory, Landmark, MorningBriefing } from "./types";
 import { resolveNeighborhood, extractZipCode } from "./geofences";
 import { resolveVenueToLandmark, landmarkToNeighborhood } from "./gazetteer";
 const parser = new Parser({
@@ -50,6 +50,44 @@ export async function normalizeContent(openai: OpenAI, title: string, content: s
     return { summary: title, venue: "Lehigh Valley", location: "Greater LV", category: "News" };
   }
 }
+export async function generateMorningBriefing(env: Env, controller: any): Promise<MorningBriefing> {
+  const openai = new OpenAI({ baseURL: env.CF_AI_BASE_URL, apiKey: env.CF_AI_API_KEY });
+  const events = await controller.listEvents();
+  // Filter events from last 48 hours
+  const cutoff = Date.now() - (48 * 60 * 60 * 1000);
+  const recentEvents = events.filter(e => new Date(e.createdAt).getTime() > cutoff);
+  const eventList = recentEvents.slice(0, 15).map(e => `- ${e.title} at ${e.venue} (${e.location})`).join('\n');
+  const prompt = `You are the Lehigh Valley Intelligence Director. Synthesize the following regional events into a concise, professional 3-sentence "Morning Briefing". 
+  Focus on identifying trends (e.g. "Bethlehem is seeing a surge in arts events") and highlighting major landmarks.
+  Events:
+  ${eventList}
+  Return JSON: { "content": "The 3-sentence summary" }`;
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "google-ai-studio/gemini-2.0-flash",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" }
+    });
+    const data = JSON.parse(completion.choices[0].message.content || "{}");
+    const uniqueLandmarks = new Set(recentEvents.map(e => e.landmarkId).filter(Boolean));
+    const briefing: MorningBriefing = {
+      id: crypto.randomUUID(),
+      date: new Date().toISOString(),
+      content: data.content || "Lehigh Valley operations are normal with standard regional activity across Allentown, Bethlehem, and Easton.",
+      highlightCount: uniqueLandmarks.size
+    };
+    await controller.saveMorningBriefing(briefing);
+    return briefing;
+  } catch (e) {
+    console.error("Briefing generation failed:", e);
+    return {
+      id: crypto.randomUUID(),
+      date: new Date().toISOString(),
+      content: "Intelligence systems are currently processing regional data. Standard news cycles continue across the Lehigh Valley.",
+      highlightCount: 0
+    };
+  }
+}
 export async function runProSync(env: Env, controller: any) {
   const openai = new OpenAI({ baseURL: env.CF_AI_BASE_URL, apiKey: env.CF_AI_API_KEY });
   let totalIngested = 0;
@@ -64,7 +102,6 @@ export async function runProSync(env: Env, controller: any) {
         const normalized = await normalizeContent(openai, item.title || "", item.contentSnippet || "", landmarks);
         let neighborhood = normalized.neighborhood;
         let neighborhoodId;
-        // Enrichment: Landmark -> Neighborhood
         const landmark = landmarks.find((l: any) => l.id === normalized.landmarkId);
         if (landmark && !neighborhood) {
           const enrichedFence = landmarkToNeighborhood(landmark, geofences);
@@ -93,7 +130,6 @@ export async function runProSync(env: Env, controller: any) {
         };
         await controller.upsertEvent(event);
         totalIngested++;
-        // Rate limiting cooldown
         await new Promise(r => setTimeout(r, 200));
       }
     } catch (err) {
