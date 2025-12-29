@@ -77,15 +77,7 @@ function updateWranglerJsonc() {
 }
 
 function runSetupCommands() {
-    const commands = [
-    "bun add rss-parser@^3.13.0",
-    "bun add cheerio@^1.0.0-rc.12",
-    "bun add lucide-react date-fns zustand",
-    "bun add rss-parser openai h3-js",
-    "bun add date-fns",
-    "bun add h3-js",
-    "bun add string-similarity"
-];
+    const commands = [];
     
     if (commands.length === 0) {
         console.log('⊘ No setup commands to run');
