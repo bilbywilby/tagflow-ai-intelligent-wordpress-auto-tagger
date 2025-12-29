@@ -12,12 +12,29 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css'
 import App from '@/App'
+import { Dashboard } from '@/pages/Dashboard';
+import TaggingStudio from '@/pages/TaggingStudio';
+import { Settings } from '@/pages/Settings';
 const queryClient = new QueryClient();
 const router = createBrowserRouter([
   {
     path: "/",
     element: <App />,
     errorElement: <RouteErrorBoundary />,
+    children: [
+      {
+        index: true,
+        element: <Dashboard />,
+      },
+      {
+        path: "studio",
+        element: <TaggingStudio />,
+      },
+      {
+        path: "settings",
+        element: <Settings />,
+      },
+    ]
   },
 ]);
 createRoot(document.getElementById('root')!).render(
