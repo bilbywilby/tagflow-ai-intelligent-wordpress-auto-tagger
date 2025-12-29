@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store/useAppStore';
 import { StudioLayout } from '@/components/layout/StudioLayout';
 import { FeedSelector } from '@/components/FeedSelector';
@@ -10,12 +11,14 @@ import { TagflowLogo } from '@/components/TagflowLogo';
 import { Info, Trash2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 export default function TaggingStudio() {
-  const articles = useAppStore((s) => s.articles);
+  // 1. Primitive and Shallow Selectors
+  const articles = useAppStore(useShallow((s) => s.articles));
   const isLoading = useAppStore((s) => s.isLoading);
   const clearArticles = useAppStore((s) => s.clearArticles);
   const addArticles = useAppStore((s) => s.addArticles);
   const updateArticle = useAppStore((s) => s.updateArticle);
   const setLoading = useAppStore((s) => s.setLoading);
+  // 2. Local State
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const handleFetchFeed = async (url: string) => {
     setLoading(true);
@@ -110,9 +113,9 @@ export default function TaggingStudio() {
     >
       {articles.length > 0 && (
         <div className="mb-10">
-          <BatchActions 
-            articles={articles} 
-            onAnalyzeAll={handleAnalyzeAll} 
+          <BatchActions
+            articles={articles}
+            onAnalyzeAll={handleAnalyzeAll}
             onSyncAll={handleSyncAll}
             isProcessing={isBatchProcessing}
           />
@@ -148,7 +151,7 @@ export default function TaggingStudio() {
             <span>AI RATE LIMIT WARNING</span>
           </div>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Please be advised that while TagFlow AI provides advanced content classification capabilities, there is a hard limit on the number of requests that can be processed by the AI models across all active sessions.
+            Please be advised that while TagFlow AI provides advanced content classification capabilities, there is a limit on the number of requests that can be made to the AI servers across all user apps in a given time period.
           </p>
           <div className="flex flex-col gap-1">
             <p className="text-xs font-bold text-foreground/50 uppercase tracking-widest">Powered by</p>
