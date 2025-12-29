@@ -7,9 +7,12 @@ interface AppState {
   settings: AppSettings;
   searchQuery: string;
   selectedCategory: string | null;
+  // Actions
   setArticles: (articles: Article[]) => void;
   addArticles: (articles: Article[]) => void;
   updateArticle: (id: string, updates: Partial<Article>) => void;
+  updateArticles: (ids: string[], updates: Partial<Article>) => void;
+  clearArticles: () => void;
   setFeedUrl: (url: string) => void;
   setLoading: (loading: boolean) => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
@@ -35,6 +38,10 @@ export const useAppStore = create<AppState>((set) => ({
   updateArticle: (id, updates) => set((state) => ({
     articles: state.articles.map((a) => (a.id === id ? { ...a, ...updates } : a)),
   })),
+  updateArticles: (ids, updates) => set((state) => ({
+    articles: state.articles.map((a) => (ids.includes(a.id) ? { ...a, ...updates } : a)),
+  })),
+  clearArticles: () => set({ articles: [] }),
   setFeedUrl: (feedUrl) => set({ feedUrl }),
   setLoading: (isLoading) => set({ isLoading }),
   updateSettings: (settings) => set((state) => ({
