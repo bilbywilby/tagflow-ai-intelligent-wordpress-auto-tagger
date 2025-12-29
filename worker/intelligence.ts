@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import Parser from "rss-parser";
 import type { Env } from "./core-utils";
 import type { HubEvent, HubLocation, HubCategory, Landmark, MorningBriefing } from "./types";
-import { resolveNeighborhood, extractZipCode } from "./geofences";
+import { extractZipCode } from "./geofences";
 import { resolveVenueToLandmark, landmarkToNeighborhood } from "./gazetteer";
 const parser = new Parser({
   customFields: {
@@ -25,7 +25,7 @@ export async function normalizeContent(openai: OpenAI, title: string, content: s
   landmarkId?: string;
 }> {
   const prompt = `Extract regional metadata from this Lehigh Valley article.
-  Return JSON: { "summary": "2 professional sentences", "venue": "specific landmark or venue name", "location": "Allentown/Bethlehem/Easton/Greater LV", "neighborhood": "specific district", "category": "Family/Nightlife/Arts/News/General" }
+  Return JSON object: { "summary": "2 sentences", "venue": "venue name", "location": "Allentown/Bethlehem/Easton/Greater LV", "neighborhood": "district", "category": "Family/Nightlife/Arts/News/General" }
   Input: ${title} - ${content.slice(0, 800)}`;
   try {
     const completion = await openai.chat.completions.create({
@@ -33,7 +33,13 @@ export async function normalizeContent(openai: OpenAI, title: string, content: s
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" }
     });
-    const data = JSON.parse(completion.choices[0].message.content || "{}");
+    let data;
+    try {
+      data = JSON.parse(completion.choices[0].message.content || "{}");
+    } catch (parseErr) {
+      console.error("AI JSON Parse Error:", parseErr);
+      data = {};
+    }
     const zipCode = extractZipCode(`${content} ${title}`);
     const landmark = resolveVenueToLandmark(data.venue || title, landmarks);
     return {
@@ -47,43 +53,46 @@ export async function normalizeContent(openai: OpenAI, title: string, content: s
       landmarkId: landmark?.id
     };
   } catch (e) {
+    console.error("Normalization pipeline failed:", e);
     return { summary: title, venue: "Lehigh Valley", location: "Greater LV", category: "News" };
   }
 }
 export async function generateMorningBriefing(env: Env, controller: any): Promise<MorningBriefing> {
   const openai = new OpenAI({ baseURL: env.CF_AI_BASE_URL, apiKey: env.CF_AI_API_KEY });
   const events = (await controller.listEvents()) as HubEvent[];
-  // Filter events from last 48 hours
   const cutoff = Date.now() - (48 * 60 * 60 * 1000);
   const recentEvents = events.filter((e: HubEvent) => new Date(e.createdAt).getTime() > cutoff);
   const eventList = recentEvents.slice(0, 15).map((e: HubEvent) => `- ${e.title} at ${e.venue} (${e.location})`).join('\n');
   const prompt = `You are the Lehigh Valley Intelligence Director. Synthesize the following regional events into a concise, professional 3-sentence "Morning Briefing".
-  Focus on identifying trends (e.g. "Bethlehem is seeing a surge in arts events") and highlighting major landmarks.
+  Return JSON: { "content": "The summary text" }
   Events:
-  ${eventList}
-  Return JSON: { "content": "The 3-sentence summary" }`;
+  ${eventList}`;
   try {
     const completion = await openai.chat.completions.create({
       model: "google-ai-studio/gemini-2.0-flash",
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" }
     });
-    const data = JSON.parse(completion.choices[0].message.content || "{}");
+    let data;
+    try {
+      data = JSON.parse(completion.choices[0].message.content || "{}");
+    } catch (e) {
+      data = { content: "Regional cycles continue across the Lehigh Valley with standard municipal and cultural activity." };
+    }
     const uniqueLandmarks = new Set(recentEvents.map((e: HubEvent) => e.landmarkId).filter(Boolean));
     const briefing: MorningBriefing = {
       id: crypto.randomUUID(),
       date: new Date().toISOString(),
-      content: data.content || "Lehigh Valley operations are normal with standard regional activity across Allentown, Bethlehem, and Easton.",
+      content: data.content || "Lehigh Valley operations are normal.",
       highlightCount: uniqueLandmarks.size
     };
     await controller.saveMorningBriefing(briefing);
     return briefing;
   } catch (e) {
-    console.error("Briefing generation failed:", e);
     return {
       id: crypto.randomUUID(),
       date: new Date().toISOString(),
-      content: "Intelligence systems are currently processing regional data. Standard news cycles continue across the Lehigh Valley.",
+      content: "Intelligence systems are currently processing regional data.",
       highlightCount: 0
     };
   }
@@ -130,7 +139,7 @@ export async function runProSync(env: Env, controller: any) {
         };
         await controller.upsertEvent(event);
         totalIngested++;
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 100));
       }
     } catch (err) {
       console.error("Pro Sync failed for source:", source.name, err);
