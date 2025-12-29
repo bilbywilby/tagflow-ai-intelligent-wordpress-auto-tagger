@@ -81,7 +81,7 @@ function runSetupCommands() {
     "bun add rss-parser@^3.13.0",
     "bun add cheerio@^1.0.0-rc.12",
     "bun add lucide-react date-fns zustand",
-    "bun add rss-parser uuid",
+    "bun add rss-parser h3-js string-similarity",
     "bun add date-fns",
     "bun add h3-js",
     "bun add string-similarity"
