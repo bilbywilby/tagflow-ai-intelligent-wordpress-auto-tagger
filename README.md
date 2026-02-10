@@ -1,6 +1,6 @@
 # Cloudflare AI Chat Agent Template
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bilbywilby/tagflow-ai-intelligent-wordpress-auto-tagger)
 
 A production-ready Cloudflare Workers application featuring a modern React frontend with persistent, multi-session AI chat powered by Durable Objects. Supports streaming responses, tool calling (web search, weather, MCP integration), model switching, and comprehensive session management.
 
@@ -115,7 +115,7 @@ Updates `./worker/env.d.ts` with binding types.
    ```
    Or use the button below:
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bilbywilby/tagflow-ai-intelligent-wordpress-auto-tagger)
 
 3. **Custom Domain**: `wrangler deploy --name my-chat-app`.
 4. **Bindings**: Ensure Durable Objects and vars are set in dashboard.
